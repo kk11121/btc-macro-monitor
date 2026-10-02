@@ -4,8 +4,8 @@
     "value": 334.131
   },
   "nfp": {
-    "date": "2026-08-01",
-    "value": 159075.0
+    "date": "2026-09-01",
+    "value": 159044.0
   },
   "fomc": {
     "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
@@ -16,7 +16,7 @@
       "value": 101.83599853515625
     },
     "us10y": {
-      "value": 5.265999794006348
+      "value": 5.188000202178955
     },
     "nasdaq": {
       "value": 27044.125
@@ -72,8 +72,8 @@
     }
   },
   "unrate": {
-    "date": "2026-08-01",
-    "value": 4.1
+    "date": "2026-09-01",
+    "value": 4.2
   },
   "icsa": {
     "date": "2026-09-26",
