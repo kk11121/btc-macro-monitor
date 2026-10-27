@@ -28,12 +28,15 @@
   "sec": {
     "date": "2026-10-27",
     "seen_ids": [
+      "0001859392-26-000108:glxy-20260930xpressrelease.htm",
       "0001633917-26-000086:pypl3q-26earningsrelease.htm",
       "0001017386-26-000149:ex991.htm",
       "0001818874-26-000065:a2026q3earningsrelease.htm",
+      "0000314489-26-000066:buse_20261027x26q3xex991.htm",
+      "0000314489-26-000066:buse_20261027x26q3xex992.htm",
+      "0001859392-26-000108:exhibit993-glxyhistorica.htm",
       "0001859392-26-000108:exhibit992-glxyq32026ove.htm",
-      "0001859392-26-000108:glxy-20260930xpressrelease.htm",
-      "0001859392-26-000108:exhibit993-glxyhistorica.htm"
+      "0001783879-26-000164:q32026robinhoodexhibit991.htm"
     ]
   },
   "stablecoin": {
