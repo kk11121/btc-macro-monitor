@@ -8,15 +8,15 @@
     "value": 159044.0
   },
   "fomc": {
-    "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
-    "date": "2026-09-16"
+    "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+    "date": "2026-10-28"
   },
   "market": {
     "dxy": {
       "value": 102.20600128173828
     },
     "us10y": {
-      "value": 4.997000217437744
+      "value": 5.043000221252441
     },
     "nasdaq": {
       "value": 26475.556640625
