@@ -26,17 +26,14 @@
     }
   },
   "sec": {
-    "date": "2026-10-27",
+    "date": "2026-10-28",
     "seen_ids": [
-      "0001859392-26-000108:glxy-20260930xpressrelease.htm",
-      "0001633917-26-000086:pypl3q-26earningsrelease.htm",
-      "0001017386-26-000149:ex991.htm",
-      "0001818874-26-000065:a2026q3earningsrelease.htm",
-      "0000314489-26-000066:buse_20261027x26q3xex991.htm",
-      "0000314489-26-000066:buse_20261027x26q3xex992.htm",
-      "0001859392-26-000108:exhibit993-glxyhistorica.htm",
-      "0001859392-26-000108:exhibit992-glxyq32026ove.htm",
-      "0001783879-26-000164:q32026robinhoodexhibit991.htm"
+      "0001493152-26-048827:form8-k.htm",
+      "0001493152-26-048827:ex99-1.htm",
+      "0001493152-26-048827:ex10-1.htm",
+      "0001783879-26-000170:q32026robinhoodamendedex991.htm",
+      "0001213900-26-113111:ea0309906-8k_stablecoinx.htm",
+      "0001021635-26-000038:oge-ex99_01.htm"
     ]
   },
   "stablecoin": {
