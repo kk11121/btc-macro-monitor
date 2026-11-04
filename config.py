@@ -1,29 +1,72 @@
 """
-通知のしきい値・判定パラメータを一元管理するファイル。
+判定の向きと閾値を一元管理するファイル。
 
-「どれくらい動いたら通知するか」をここだけで調整できます。
-- 数字を小さくすると敏感になり、通知が増えます。
-- 数字を大きくすると鈍感になり、通知が減ります。
+「どちらを強気とするか」「どれくらい動いたら通知するか」をここだけで調整できます。
 他のコードを触らず、この値だけ変えれば挙動が変わります。
 """
 
-# ── Phase 2: 市場指標のしきい値 ───────────────────────────────────
-# "pct" = 変化率（％ベース）、"abs" = 変化量そのもの
-MARKET_THRESHOLDS: dict[str, dict] = {
-    "dxy":    {"type": "pct", "value": 0.005},   # ドル指数 DXY: ±0.5% 以上で通知
-    "us10y":  {"type": "abs", "value": 0.03},    # 米国10年債利回り: ±0.03%(3bp) 以上で通知
-    "nasdaq": {"type": "pct", "value": 0.010},   # NASDAQ: ±1.0% 以上で通知
-    "vix":    {"type": "pct", "value": 0.10},    # VIX(恐怖指数): ±10% 以上で通知
+# ── 判定の向き ─────────────────────────────────────────────────────────────
+RISE_BULLISH = 1   # 上がったら強気
+RISE_BEARISH = -1  # 上がったら弱気
+
+# 値の上下で判定する指標（設計書「判定ルール」）。
+# 予想値がある指標（core_cpi など）は、Phase B までは前回値との比較に使う。
+DIRECTION: dict[str, int] = {
+    "dxy": RISE_BEARISH,
+    "us10y": RISE_BEARISH,
+    "nasdaq": RISE_BULLISH,
+    "vix": RISE_BEARISH,
+    "usdt": RISE_BULLISH,
+    "usdc": RISE_BULLISH,
+    "m2sl": RISE_BULLISH,
+    "walcl": RISE_BULLISH,
+    "btc_exchange": RISE_BEARISH,
+    "core_cpi": RISE_BEARISH,
+    "core_pce": RISE_BEARISH,
+    "nfp": RISE_BEARISH,
+    "unrate": RISE_BULLISH,
+    "icsa": RISE_BULLISH,
 }
 
-# VIX がこの水準を超えて急騰した場合は「🚨 急騰警戒」の優先通知にする
-VIX_PRIORITY_LEVEL = 20.0
+# 「同じ」とみなす幅。ここにない指標は完全一致のときだけ中立。
+# CPI・コアPCE・失業率は小数1桁に丸めてから比べるので幅は持たない。
+FLAT_BAND: dict[str, float] = {
+    "nfp": 25.0,     # 千人（±2.5万人）
+    "icsa": 5000.0,  # 件
+}
 
-# ── Phase 3: 供給量・流動性のしきい値（変化率％）─────────────────
-STABLECOIN_THRESHOLD_PCT = 2.0    # USDT / USDC 供給量: ±2% 以上で通知
-BTC_EXCHANGE_THRESHOLD_PCT = 1.0  # 取引所の BTC 保有量: ±1% 以上で通知
-LIQUIDITY_THRESHOLD_PCT = 0.5     # M2 / FRBバランスシート: ±0.5% 以上で通知
+# 流れの量を見る指標。前日との差ではなく、その日の符号で判定する。
+FLOW_DIRECTION: dict[str, int] = {
+    "spot_etf": RISE_BULLISH,          # ETF への流入は現物の買い
+    "exchange_netflow": RISE_BEARISH,  # 取引所への流入は売り圧力
+}
 
-# ── Phase 4: Funding Rate のしきい値 ─────────────────────────────
-# 符号が反転（プラス↔マイナス）するか、この値を跨いだときに通知
-FUNDING_RATE_THRESHOLD = 0.0005   # 0.05%（8時間あたり）
+# FOMC声明の決定と判定（"bullish" / "bearish" / "neutral"）
+FOMC_DECISION_VERDICT: dict[str, str] = {
+    "lower": "bullish",
+    "raise": "bearish",
+    "maintain": "neutral",
+}
+
+# ── VIX ───────────────────────────────────────────────────────────────────
+VIX_ALERT_RISE_PCT = 10.0      # 前回通知値からの上昇率がこれ以上で、
+VIX_ALERT_LEVEL = 20.0         # かつこの水準を超えたら即時通知
+VIX_BASELINE_DROP_PCT = 10.0   # これ以上下がったら通知せず基準だけ下げる
+
+# ── 日次フロー ─────────────────────────────────────────────────────────────
+FLOW_LOOKBACK_DAYS = 90    # 普段の振れ幅を計算する日数（ETF は取引日）
+FLOW_SIGMA = 2.0           # 平均 ± この倍率 × 標準偏差 を「普段の範囲」とする
+FLOW_MIN_SAMPLES = 20      # これ未満の履歴では範囲を計算しない
+ETF_HISTORY_KEEP_DAYS = 120  # history/etf_flows.json に残す取引日数
+
+# ── 朝のまとめの注記 ───────────────────────────────────────────────────────
+FUNDING_NOTE_THRESHOLD = 0.0003  # ±0.03% を超えたら注記
+FEAR_GREED_NOTE_ZONES = {"extreme_fear", "extreme_greed"}
+
+# ── 発表時刻 ───────────────────────────────────────────────────────────────
+RELEASE_TIME_ET = (8, 30)  # CPI・雇用統計・コアPCE・新規失業保険申請（米東部）
+
+# ── Claude（FOMC議事録の要約のみ）─────────────────────────────────────────
+SUMMARY_MODEL = "claude-sonnet-5-5"
+SUMMARY_MAX_TOKENS = 16000
+SUMMARY_MAX_CHARS = 400  # 通知に載せる要約の上限

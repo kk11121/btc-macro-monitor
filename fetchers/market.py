@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 import yfinance as yf
 
+from fetchers.validation import finite_float
+
 logger = logging.getLogger(__name__)
 
 TICKERS: dict[str, dict] = {
@@ -49,7 +51,7 @@ def fetch_market(key: str) -> dict:
     return {
         "key": key,
         "name": info["name"],
-        "value": float(price),
+        "value": finite_float(price),
         "url": info["url"],
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
     }

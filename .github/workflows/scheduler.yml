@@ -2,35 +2,34 @@ name: BTC Macro Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'   # monitor: 毎時0分 (UTC)
-    - cron: '15 * * * *'  # glassnode_check: 毎時15分 (UTC)
-    - cron: '30 * * * *'  # sec_check: 毎時30分 (UTC)
-    - cron: '0 0 * * *'   # stablecoin_check: 毎日0:00 UTC (日本時間9:00)
-    - cron: '0 21 * * 3'  # liquidity_check: 毎週水曜21:00 UTC (木曜6:00 JST)
+    # 毎時0分付近は混むので実行の分をずらす
+    - cron: '47 22 * * *'  # 朝のまとめ: 毎日 22:47 UTC（日本時間 7:47）
+    - cron: '23 * * * *'   # 毎時の監視: 毎時23分
   workflow_dispatch:
     inputs:
       mode:
         description: 'Run mode'
         required: false
-        default: 'monitor'
+        default: 'hourly'
         type: choice
-        options: [monitor, glassnode, sec, stablecoin, liquidity]
+        options: [hourly, morning]
 
 permissions:
   contents: write
 
-# ── 共通ステップ定義 ───────────────────────────────────────────────────────────
-# GitHub Actionsはreusable workflowが使えるが、シンプルさのため各jobに展開する
+# state.json を同時に書き換えないよう、実行を1つずつ順番に流す
+concurrency:
+  group: btc-monitor-state
+  cancel-in-progress: false
 
 jobs:
-
-  # ── Phase 1+2: FRED / FOMC / Market ────────────────────────────────────────
   monitor:
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'monitor'
-      || github.event_name == 'schedule' && startsWith(github.event.schedule, '0 *')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      RUN_MODE: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.mode
+        || (github.event.schedule == '47 22 * * *' && 'morning' || 'hourly') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,152 +39,27 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
       - run: pip install -r requirements.txt
-      - name: Run monitor (Phase 1+2)
+      - name: Run monitor
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SOSOVALUE_API_KEY: ${{ secrets.SOSOVALUE_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py --mode monitor
-      - name: Commit updated state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json
-          git diff --staged --quiet || git commit -m "chore: update monitor state [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-
-  # ── Phase 4: Glassnode on-chain ────────────────────────────────────────────
-  glassnode_check:
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'glassnode'
-      || github.event_name == 'schedule' && startsWith(github.event.schedule, '15 *')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install -r requirements.txt
-      - name: Run Glassnode check
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py --mode glassnode
-      - name: Commit updated state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json
-          git diff --staged --quiet || git commit -m "chore: update glassnode state [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-
-  # ── Phase 3: SEC EDGAR ─────────────────────────────────────────────────────
-  sec_check:
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sec'
-      || github.event_name == 'schedule' && startsWith(github.event.schedule, '30 *')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install -r requirements.txt
-      - name: Run SEC check
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py --mode sec
-      - name: Commit updated state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json
-          git diff --staged --quiet || git commit -m "chore: update sec state [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-
-  # ── Phase 3: Stablecoin & BTC exchange holdings ────────────────────────────
-  stablecoin_check:
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'stablecoin'
-      || github.event_name == 'schedule' && startsWith(github.event.schedule, '0 0')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install -r requirements.txt
-      - name: Run stablecoin check
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-        run: python main.py --mode stablecoin
-      - name: Commit updated state
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json
-          git diff --staged --quiet || git commit -m "chore: update stablecoin state [skip ci]"
-          for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
-            echo "Push attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-
-  # ── Phase 3: Liquidity (M2 / WALCL) ────────────────────────────────────────
-  liquidity_check:
-    if: >
-      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'liquidity'
-      || github.event_name == 'schedule' && startsWith(github.event.schedule, '0 21')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-      - run: pip install -r requirements.txt
-      - name: Run liquidity check
-        env:
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py --mode liquidity
+        run: python main.py --mode "$RUN_MODE"
+      # 通知に失敗して終了コードが 1 でも、送れた指標の状態は保存する
       - name: Commit updated state
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json
-          git diff --staged --quiet || git commit -m "chore: update liquidity state [skip ci]"
+          if [ -f history/etf_flows.json ]; then git add history/etf_flows.json; fi
+          git diff --staged --quiet || git commit -m "chore: update $RUN_MODE state [skip ci]"
           for i in 1 2 3; do
-            git pull --rebase origin main && git push && break
+            git pull --rebase origin main && git push && exit 0
             echo "Push attempt $i failed, retrying in 10s..."
             sleep 10
           done
+          echo "::error::state の push に3回失敗しました"
+          exit 1

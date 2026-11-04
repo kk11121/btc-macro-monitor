@@ -2,6 +2,8 @@ import logging
 import requests
 from datetime import date, datetime, timezone
 
+from fetchers.validation import finite_float
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,22 +16,6 @@ _FG_ZONE_MAP = {
     "Greed":         ("greed",         "強欲"),
     "Extreme Greed": ("extreme_greed", "極度の強欲"),
 }
-
-FEAR_GREED_ZONES = [
-    (0,  24, "extreme_fear",  "極度の恐怖"),
-    (25, 44, "fear",          "恐怖"),
-    (45, 55, "neutral",       "中立"),
-    (56, 75, "greed",         "強欲"),
-    (76, 100, "extreme_greed", "極度の強欲"),
-]
-
-
-def get_fear_greed_zone(value: float) -> tuple[str, str]:
-    """Return (zone_key, zone_label) for a Fear & Greed value."""
-    for lo, hi, key, label in FEAR_GREED_ZONES:
-        if lo <= value <= hi:
-            return key, label
-    return "unknown", "不明"
 
 
 def fetch_fear_greed() -> dict:
@@ -47,7 +33,7 @@ def fetch_fear_greed() -> dict:
     )
     resp.raise_for_status()
     entry = resp.json()["data"][0]
-    value = float(entry["value"])
+    value = finite_float(entry["value"])
     data_date = date.fromtimestamp(int(entry["timestamp"])).isoformat()
     zone, zone_label = _FG_ZONE_MAP.get(
         entry["value_classification"], ("unknown", "不明")
@@ -86,7 +72,7 @@ def fetch_funding_rate() -> dict:
     if data.get("code") != "0":
         raise RuntimeError(f"OKX API error: {data.get('msg')}")
     entry = data["data"][0]
-    value = float(entry["fundingRate"])
+    value = finite_float(entry["fundingRate"])
     data_date = datetime.fromtimestamp(
         int(entry["fundingTime"]) / 1000, tz=timezone.utc
     ).strftime("%Y-%m-%d %H:%M UTC")

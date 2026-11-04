@@ -3,6 +3,8 @@ import logging
 import requests
 from datetime import datetime, timezone
 
+from fetchers.validation import finite_float
+
 logger = logging.getLogger(__name__)
 
 COINGECKO_BASE = "https://api.coingecko.com/api/v3"
@@ -51,7 +53,7 @@ def fetch_stablecoin(key: str) -> dict:
         timeout=30,
     )
     resp.raise_for_status()
-    supply = float(resp.json()["market_data"]["circulating_supply"])
+    supply = finite_float(resp.json()["market_data"]["circulating_supply"])
 
     return {
         "key": key,

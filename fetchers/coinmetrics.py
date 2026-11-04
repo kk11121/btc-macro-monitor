@@ -1,17 +1,22 @@
 import logging
+from datetime import datetime, timedelta, timezone
+
 import requests
-from datetime import date, timedelta, datetime, timezone
+
+import config
+from fetchers.validation import finite_float, valid_date
 
 logger = logging.getLogger(__name__)
 
 BASE = "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics"
+PAGE_SIZE = 200  # 既定の100だと期間の古い側だけが返り、最新の行が落ちる
+SUPPLY_LOOKBACK_DAYS = 3
 
 
-def _fetch(metrics: str) -> dict:
-    """Fetch the latest BTC metric(s) from CoinMetrics Community API (no key required)."""
-    # Go back 3 days to guarantee data exists (flash data may lag 1-2 days)
-    end = date.today()
-    start = end - timedelta(days=3)
+def _fetch_rows(metrics: str, days: int) -> list[dict]:
+    """BTC の指標を古い順に返す（キー不要）。"""
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=days)
     resp = requests.get(
         BASE,
         params={
@@ -19,64 +24,40 @@ def _fetch(metrics: str) -> dict:
             "metrics": metrics,
             "start_time": start.isoformat(),
             "end_time": end.isoformat(),
+            "page_size": PAGE_SIZE,
         },
         timeout=30,
     )
     if not resp.ok:
-        raise RuntimeError(
-            f"CoinMetrics {metrics} returned HTTP {resp.status_code}: {resp.text[:200]}"
-        )
-    rows = resp.json().get("data", [])
-    if not rows:
-        raise ValueError(f"CoinMetrics returned empty data for {metrics}")
-    return rows[-1]  # most recent entry
+        raise RuntimeError(f"CoinMetrics {metrics} returned HTTP {resp.status_code}")
+    return resp.json().get("data", [])
 
-
-# ── 取引所BTC保有量 ────────────────────────────────────────────────────────────
 
 def fetch_exchange_supply() -> dict:
-    """
-    Fetch total BTC held on exchanges from CoinMetrics Community API.
-    Metric: SplyExNtv (Supply held by exchanges, native units = BTC).
-
-    Returns:
-        dict with: key, name, value (BTC float), date, url
-    """
-    row = _fetch("SplyExNtv")
-    value = float(row["SplyExNtv"])
-    data_date = row["time"][:10]  # YYYY-MM-DD
-
+    """取引所のBTC残高（SplyExNtv）の最新値を返す。"""
+    rows = [r for r in _fetch_rows("SplyExNtv", SUPPLY_LOOKBACK_DAYS) if "SplyExNtv" in r]
+    if not rows:
+        raise ValueError("CoinMetrics returned empty data for SplyExNtv")
     return {
-        "key": "btc_exchange",
-        "name": "取引所BTC保有量",
-        "value": value,
-        "data_date": data_date,
-        "url": "https://coinmetrics.io/network-data/",
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "value": finite_float(rows[-1]["SplyExNtv"]),
+        "date": valid_date(rows[-1]["time"][:10]),
     }
 
 
-# ── 取引所BTC純流入（全取引所合計） ─────────────────────────────────────────────
-
-def fetch_exchange_netflow() -> dict:
+def fetch_exchange_netflow_history() -> list[dict]:
     """
-    Fetch BTC net flow into all exchanges from CoinMetrics Community API.
-    Net flow = FlowInExNtv - FlowOutExNtv (positive = net inflow = bearish signal).
-
-    Returns:
-        dict with: key, name, value (BTC float, net inflow), date, url
+    取引所へのBTC純流入（流入 − 流出、プラスは売り圧力）を新しい順に返す。
+    普段の振れ幅の計算に使うので、過去90日分より少し多めに取る。
     """
-    row = _fetch("FlowInExNtv,FlowOutExNtv")
-    inflow = float(row["FlowInExNtv"])
-    outflow = float(row["FlowOutExNtv"])
-    net = inflow - outflow
-    data_date = row["time"][:10]
-
-    return {
-        "key": "etf_flow",          # detector の既存キーを流用
-        "name": "取引所BTC純流入（全取引所）",
-        "value": net,
-        "date": data_date,
-        "url": "https://coinmetrics.io/network-data/",
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-    }
+    days = config.FLOW_LOOKBACK_DAYS + 10
+    rows = [
+        {
+            "date": valid_date(row["time"][:10]),
+            "value": finite_float(row["FlowInExNtv"]) - finite_float(row["FlowOutExNtv"]),
+        }
+        for row in _fetch_rows("FlowInExNtv,FlowOutExNtv", days)
+        if "FlowInExNtv" in row and "FlowOutExNtv" in row
+    ]
+    if not rows:
+        raise ValueError("CoinMetrics returned empty data for exchange net flow")
+    return sorted(rows, key=lambda row: row["date"], reverse=True)
