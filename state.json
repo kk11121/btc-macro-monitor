@@ -13,8 +13,8 @@
       "date": "2026-10-28"
     },
     "minutes": {
-      "url": null,
-      "date": null
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "date": "2026-09-16"
     }
   },
   "market": {
@@ -78,8 +78,8 @@
   },
   "schema_version": 2,
   "core_pce": {
-    "date": null,
-    "value": null
+    "date": "2026-09-01",
+    "value": 130.902
   },
   "errors": {}
 }
