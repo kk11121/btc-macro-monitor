@@ -8,75 +8,28 @@
     "value": 159044.0
   },
   "fomc": {
-    "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
-    "date": "2026-10-28"
+    "statement": {
+      "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+      "date": "2026-10-28"
+    },
+    "minutes": {
+      "url": null,
+      "date": null
+    }
   },
   "market": {
-    "dxy": {
-      "value": 101.65899658203125
-    },
-    "us10y": {
-      "value": 4.956000328063965
-    },
-    "nasdaq": {
-      "value": 25164.36328125
-    },
     "vix": {
       "value": 20.219999313354492
     }
   },
-  "sec": {
-    "date": "2026-11-03",
-    "seen_ids": [
-      "0001482541-26-000072:bnc-2026x10x02xpr1.htm",
-      "0001493152-26-049653:form8-k.htm",
-      "0001522540-26-000076:mqearningsrelease-q3x2026.htm",
-      "0001383312-26-000030:exhibit992earningspresen.htm",
-      "0001493152-26-049653:ex99-1.htm",
-      "0001628280-26-069513:q32026shareholderletter.htm",
-      "0001185185-26-005151:zsqr8k110326.htm",
-      "0001559865-26-000052:ex99109302026.htm",
-      "0001383312-26-000030:ex991earningsrelease1q2027.htm",
-      "0001829126-26-011938:titanacq_ex99-1.htm",
-      "0001193125-26-445531:d178610dex991.htm",
-      "0001663577-26-000333:ex10_1.htm",
-      "0001104659-26-121990:nbhc-ex99d1.htm",
-      "0001104659-26-122022:bwb-ex99d1.htm"
-    ]
-  },
-  "stablecoin": {
-    "usdt": {
-      "value": 181029976505.82587
-    },
-    "usdc": {
-      "value": 71088115614.29836
-    },
-    "btc_exchange": {
-      "value": 2660347.54665271
-    }
-  },
   "liquidity": {
     "m2sl": {
-      "date": "2026-08-01",
-      "value": 23342.8
+      "date": "2026-09-01",
+      "value": 23413.9
     },
     "walcl": {
-      "date": "2026-07-22",
-      "value": 6747378.0
-    }
-  },
-  "glassnode": {
-    "fear_greed": {
-      "value": 34.0,
-      "zone": "fear",
-      "date": "2026-11-04"
-    },
-    "etf_flow": {
-      "date": "2026-11-03",
-      "value": 5999.4417225
-    },
-    "funding_rate": {
-      "value": 0.0001
+      "date": "2026-10-28",
+      "value": 6745635.0
     }
   },
   "unrate": {
@@ -86,5 +39,47 @@
   "icsa": {
     "date": "2026-10-24",
     "value": 194000.0
-  }
+  },
+  "flows": {
+    "spot_etf": {
+      "date": "2026-11-03",
+      "value": -115563333.61999999,
+      "source": "sosovalue",
+      "outside": false,
+      "band": {
+        "mean": 50348120.819111116,
+        "low": -527032047.25427425,
+        "high": 627728288.8924965,
+        "samples": 90
+      }
+    },
+    "exchange_netflow": {
+      "date": "2026-11-03",
+      "value": 5999.4417225
+    }
+  },
+  "summary": {
+    "last_date": "2026-11-04",
+    "values": {
+      "dxy": 101.51200103759766,
+      "us10y": 4.952000141143799,
+      "nasdaq": 25372.009765625,
+      "vix": 20.829999923706055,
+      "usdt": 178373746488.0956,
+      "usdc": 70615833765.41429,
+      "btc_exchange": 2667085.95670123,
+      "fear_greed": {
+        "value": 34.0,
+        "zone": "fear",
+        "date": "2026-11-04"
+      },
+      "funding_rate": 9.4318530852e-05
+    }
+  },
+  "schema_version": 2,
+  "core_pce": {
+    "date": null,
+    "value": null
+  },
+  "errors": {}
 }
