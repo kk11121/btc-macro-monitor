@@ -16,7 +16,9 @@ def paths(tmp_path, monkeypatch):
 
 def test_runs_selected_job(paths, monkeypatch):
     ran = []
-    monkeypatch.setattr(main.jobs_morning, "run_morning", lambda rt: ran.append("morning"))
+    monkeypatch.setattr(
+        main.jobs_morning, "run_morning", lambda rt, force=False: ran.append("morning")
+    )
     monkeypatch.setattr(main.jobs_hourly, "run_hourly", lambda rt: ran.append("hourly"))
     assert main.main(["--mode", "morning"]) == 0
     assert main.main(["--mode", "hourly"]) == 0
@@ -44,7 +46,7 @@ def test_exit_code_is_one_when_a_notification_failed(paths, monkeypatch):
 
 
 def test_uncaught_job_failure_is_isolated_in_morning(paths, monkeypatch):
-    def job(rt):
+    def job(rt, force=False):
         raise RuntimeError("bug")
 
     sent = []
@@ -101,3 +103,20 @@ def test_dry_run_writes_nothing_and_sends_nothing(paths, monkeypatch):
     assert main.main(["--mode", "hourly", "--dry-run"]) == 0
     assert sent == []
     assert paths.read_text(encoding="utf-8") == text
+
+
+def test_force_is_passed_to_morning(paths, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        main.jobs_morning, "run_morning", lambda rt, force=False: calls.append(force)
+    )
+    assert main.main(["--mode", "morning"]) == 0
+    assert main.main(["--mode", "morning", "--force"]) == 0
+    assert calls == [False, True]
+
+
+def test_force_is_ignored_for_hourly(paths, monkeypatch):
+    ran = []
+    monkeypatch.setattr(main.jobs_hourly, "run_hourly", lambda rt: ran.append("hourly"))
+    assert main.main(["--mode", "hourly", "--force"]) == 0
+    assert ran == ["hourly"]

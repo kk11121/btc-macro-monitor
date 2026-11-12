@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 JST = ZoneInfo("Asia/Tokyo")
 EASTERN = ZoneInfo("America/New_York")
 NO_FORECAST = "予想値なし（前回値と比較）"
+YOY_BASE_MISSING = "—（基準月のデータなし）"  # 2025年10月など、FRED で欠測の月が基準になるとき
 CPI_ROWS = 15     # 前年比の基準月まで届くように多めに取る
 MONTHLY_ROWS = 3  # 今月・先月・先々月
 FOMC_ACTIONS = {"lower": "利下げ", "raise": "利上げ", "maintain": "据え置き"}
@@ -89,9 +90,26 @@ def _check_release(
     rt.store.set((key,), latest)
 
 
-def _rate_line(label: str, calculate: Callable, rows: list[dict], date_str: str) -> str:
-    current = notifier.format_signed_percent(calculate(rows, date_str))
-    previous = notifier.format_signed_percent(calculate(rows, rules.months_before(date_str, 1)))
+def _mom_text(rows: list[dict], date_str: str) -> str:
+    return notifier.format_signed_percent(rules.month_over_month(rows, date_str))
+
+
+def _yoy_text(rows: list[dict], date_str: str) -> str:
+    """前年比。対象月はあるのに基準月（12か月前）が欠測なら、その理由を書く。"""
+    value = rules.year_over_year(rows, date_str)
+    if value is not None:
+        return notifier.format_signed_percent(value)
+    has_target = any(row["date"] == date_str for row in rows)
+    if has_target and rules.is_missing_month(rows, rules.months_before(date_str, 12)):
+        return YOY_BASE_MISSING
+    return notifier.format_signed_percent(None)
+
+
+def _rate_line(
+    label: str, rate_text: Callable[[list[dict], str], str], rows: list[dict], date_str: str
+) -> str:
+    current = rate_text(rows, date_str)
+    previous = rate_text(rows, rules.months_before(date_str, 1))
     return f"{label} {current}（先月 {previous}）"
 
 
@@ -107,10 +125,10 @@ def _cpi_message(rows: list[dict], stored: dict) -> str:
         rules.month_over_month(core, rules.months_before(date_str, 1)),
     )
     lines = [
-        _rate_line("コア前月比", rules.month_over_month, core, date_str) + " ← 判定に使用",
-        _rate_line("コア前年比", rules.year_over_year, core_nsa, date_str),
-        _rate_line("総合前月比", rules.month_over_month, rows, date_str),
-        _rate_line("総合前年比", rules.year_over_year, headline_nsa, date_str),
+        _rate_line("コア前月比", _mom_text, core, date_str) + " ← 判定に使用",
+        _rate_line("コア前年比", _yoy_text, core_nsa, date_str),
+        _rate_line("総合前月比", _mom_text, rows, date_str),
+        _rate_line("総合前年比", _yoy_text, headline_nsa, date_str),
     ]
     title = f"CPI（{notifier.format_month(date_str)}）"
     return _macro_message("core_cpi", title, verdict, lines)
@@ -155,7 +173,7 @@ def _core_pce_message(rows: list[dict], stored: dict) -> str:
         rules.month_over_month(rows, date_str),
         rules.month_over_month(rows, rules.months_before(date_str, 1)),
     )
-    line = _rate_line("コアPCE前月比", rules.month_over_month, rows, date_str)
+    line = _rate_line("コアPCE前月比", _mom_text, rows, date_str)
     title = f"コアPCE（{notifier.format_month(date_str)}）"
     return _macro_message("core_pce", title, verdict, [line])
 

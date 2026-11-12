@@ -48,6 +48,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         action="store_true",
         help="取得と判定だけ行い、通知の本文を画面に出す。送信も保存もしない",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="朝のまとめを、その日に送信済みでも送り直す（hourly では無視）",
+    )
     return parser.parse_args(argv)
 
 
@@ -67,8 +72,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     rt = Runtime(store, ETF_HISTORY_FILE, sender=notifier.send, dry_run=args.dry_run)
-    job = jobs_morning.run_morning if args.mode == "morning" else jobs_hourly.run_hourly
-    rt.guard(f"job_{args.mode}", JOB_LABELS[args.mode], lambda: job(rt))
+    if args.mode == "hourly" and args.force:
+        logger.info("--force は朝のまとめだけに効くため無視します")
+
+    def job() -> None:
+        if args.mode == "morning":
+            jobs_morning.run_morning(rt, force=args.force)
+        else:
+            jobs_hourly.run_hourly(rt)
+
+    rt.guard(f"job_{args.mode}", JOB_LABELS[args.mode], job)
 
     logger.info("=== BTC Monitor done ===")
     return 1 if rt.notification_failed else 0

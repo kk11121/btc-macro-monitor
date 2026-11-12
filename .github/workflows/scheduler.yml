@@ -1,6 +1,9 @@
 name: BTC Macro Monitor
 
 on:
+  # 主な起動は外部タイマー（cron-job.org）からの workflow_dispatch。手順は README。
+  # GitHub の定時実行は間引かれて数時間遅れることがあるので、予備として残す。
+  # 朝のまとめは同じ日に2回目が動いても送らない（入力 force を付けたときを除く）。
   schedule:
     # 毎時0分付近は混むので実行の分をずらす
     - cron: '47 22 * * *'  # 朝のまとめ: 毎日 22:47 UTC（日本時間 7:47）
@@ -13,6 +16,11 @@ on:
         default: 'hourly'
         type: choice
         options: [hourly, morning]
+      force:
+        description: '朝のまとめを、その日に送信済みでも送り直す'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -30,10 +38,17 @@ jobs:
       RUN_MODE: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.mode
         || (github.event.schedule == '47 22 * * *' && 'morning' || 'hourly') }}
+      # API から "true" の文字列で送られても効くよう、文字列にして比べる
+      FORCE_FLAG: >-
+        ${{ github.event_name == 'workflow_dispatch'
+        && format('{0}', inputs.force) == 'true' && '--force' || '' }}
     steps:
+      # 起動した時点ではなく、実行を始めた時点の main を取る。順番待ちの間に前の実行が
+      # state.json を更新していても、それを読んでから動く（朝のまとめの二重送信を防ぐ）
       - uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -46,7 +61,8 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: python main.py --mode "$RUN_MODE"
+        # FORCE_FLAG は空のことがあるので、引用符で囲まない
+        run: python main.py --mode "$RUN_MODE" $FORCE_FLAG
       # 通知に失敗して終了コードが 1 でも、送れた指標の状態は保存する
       - name: Commit updated state
         if: always()

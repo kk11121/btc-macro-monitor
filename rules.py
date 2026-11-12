@@ -121,6 +121,17 @@ def year_over_year(rows: list[dict], date_str: str) -> float | None:
     return _percent_change(_value_at(rows, date_str), _value_at(rows, months_before(date_str, 12)))
 
 
+def is_missing_month(rows: list[dict], date_str: str) -> bool:
+    """
+    取得した範囲の中にその月の行がない（FRED で欠測）なら True。
+    範囲より古い月は欠測かどうか分からないので False。
+    """
+    dates = [row["date"] for row in rows]
+    if not dates:
+        return False
+    return min(dates) <= date_str <= max(dates) and date_str not in dates
+
+
 def monthly_change(rows: list[dict], date_str: str) -> float | None:
     """前月からの増減（NFP）。前の月が欠測なら None。"""
     current = _value_at(rows, date_str)

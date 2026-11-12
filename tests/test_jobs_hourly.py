@@ -116,7 +116,37 @@ def test_cpi_missing_yoy_base_month_does_not_fail(make_runtime, sender, monkeypa
     series = {"cpi": gap, "cpi_nsa": gap, "core_cpi": gap, "core_cpi_nsa": gap}
     monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
     jobs_hourly.check_cpi(rt)
-    assert "コア前年比 ―" in sender.messages[0]
+    text = sender.messages[0]
+    assert "コア前年比 —（基準月のデータなし）（先月 +" in text
+    assert "総合前年比 —（基準月のデータなし）（先月 +" in text
+    assert "コア前月比 +" in text  # 前月比は影響を受けない
+
+
+def test_cpi_previous_month_yoy_with_missing_base_is_labeled(make_runtime, sender, monkeypatch):
+    """11月分では、先月（10月分）の前年比の基準月が欠測になる。"""
+    rt = make_runtime({"cpi": {"date": "2026-10-01", "value": 336.0}})
+    months = _months(340.0, 0.3, count=jobs_hourly.CPI_ROWS, month=11)
+    gap = [r for r in months if r["date"] != "2025-10-01"]
+    series = {"cpi": gap, "cpi_nsa": gap, "core_cpi": gap, "core_cpi_nsa": gap}
+    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
+    jobs_hourly.check_cpi(rt)
+    text = sender.messages[0]
+    assert "コア前年比 +" in text
+    assert "（先月 —（基準月のデータなし））" in text
+
+
+def test_cpi_yoy_outside_fetched_range_is_not_labeled_as_missing(
+    make_runtime, sender, monkeypatch
+):
+    """取得範囲が足りないだけのときは、基準月の欠測とは書かない。"""
+    rt = make_runtime({"cpi": {"date": "2026-08-01", "value": 336.0}})
+    short = _months(340.0, 0.3, count=3)
+    series = {"cpi": short, "cpi_nsa": short, "core_cpi": short, "core_cpi_nsa": short}
+    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
+    jobs_hourly.check_cpi(rt)
+    text = sender.messages[0]
+    assert "コア前年比 ―（先月 ―）" in text
+    assert "基準月のデータなし" not in text
 
 
 def test_cpi_same_date_is_silent(make_runtime, sender, monkeypatch):

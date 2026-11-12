@@ -42,6 +42,7 @@ GitHub Actions で定期実行し、結果を Discord に送る。強気・弱�
 - 普段の範囲：過去90日（ETFは90取引日）の平均 ± 2標準偏差
 - VIX：10%以上下がったら通知せず基準だけ下げる。高いままの基準で次の急騰を見逃さないため
 - 前年比は季節調整なし、前月比は季節調整ありの系列で計算し、小数1桁に丸めて比べる
+- 前年比の基準月（12か月前）が FRED で欠測のとき（2025年10月など）は「—（基準月のデータなし）」と出す。2026年10月分は今月の値、11月分は「先月」の値がこの表示になる
 
 ## 指標の読み方（なぜBTCに効くのか）
 
@@ -112,20 +113,79 @@ GitHub Actions で定期実行し、結果を Discord に送る。強気・弱�
 
 リポジトリの `Actions` タブでワークフローを有効にする。
 
+### 3. 外部タイマーを設定
+
+GitHub の定時実行は間引かれて数時間遅れることがあるので、外部タイマーから起動する。手順は「[外部タイマーからの起動](#外部タイマーからの起動)」。
+
 ## ジョブ
 
-時刻はUTC。GitHub の定時実行は毎時0分付近が混むので、実行の分をずらしている。
+起動は外部タイマー（cron-job.org）からの `workflow_dispatch` が主で、GitHub の定時実行（`schedule`）は予備。予備の時刻はUTCで、毎時0分付近が混むので実行の分をずらしている。
 
-| ジョブ | mode | 実行 | 中身 |
+| ジョブ | mode | 予備の定時実行 | 中身 |
 |--------|------|------|------|
 | 朝のまとめ | `morning` | 毎日 22:47（日本時間 7:47） | 全指標の取得、まとめの通知 |
 | 毎時の監視 | `hourly` | 毎時 23分 | VIX急騰、FOMC（臨時の発表を含む）、日次フローの新着、経済指標の新着 |
+
+- 朝のまとめは、その日（日本時間）にすでに送っていれば何もせず終わる。外部タイマーと予備の定時実行の両方が動いても二重には届かない。送信に失敗した日は記録しないので、次の起動で送り直す
+- 毎時の監視は、通知済みの日付を `state.json` で見ているので、何度動いても同じ通知は届かない
 
 手動実行：
 
 ```
 Actions → BTC Macro Monitor → Run workflow → mode を選択
 ```
+
+朝のまとめを同じ日にもう一度送るときは `force` にチェックを入れる。
+
+## 外部タイマーからの起動
+
+GitHub の定時実行は混雑すると間引かれ、数時間遅れたり飛ばされたりする（実績では1日に約5回しか動かなかった）。そのため、cron-job.org から GitHub の API を呼んでワークフローを起動する。
+
+### トークン
+
+fine-grained personal access token を作る（GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens）。
+
+| 項目 | 設定 |
+|------|------|
+| Repository access | Only select repositories → `kk11121/btc-macro-monitor` だけ |
+| Repository permissions | **Actions: Read and write**（Metadata: Read-only は自動で付く）。ほかは不要 |
+| Expiration | 期限を付け、切れる前に作り直す。切れると外部からの起動が止まり、予備の定時実行だけになる |
+
+- classic のトークンでも動くが、`repo` スコープが要り、自分の全リポジトリに効くのですすめない
+- トークンは cron-job.org にだけ保存する。このリポジトリや GitHub Secrets には入れない（ワークフロー側では使わない）
+
+### リクエスト
+
+| 項目 | 値 |
+|------|------|
+| アドレス | `https://api.github.com/repos/kk11121/btc-macro-monitor/actions/workflows/scheduler.yml/dispatches` |
+| メソッド | `POST` |
+| ヘッダー | `Accept: application/vnd.github+json`<br>`Authorization: Bearer <トークン>`<br>`X-GitHub-Api-Version: 2022-11-28`<br>`Content-Type: application/json` |
+| 成功の応答 | 2xx（本文なしの 204、または実行の ID 入りの 200） |
+
+GitHub の API は `User-Agent` ヘッダーも必須だが、cron-job.org が自動で付ける。
+
+送る内容（ジョブごとに cron-job.org の予定を分ける）：
+
+| 予定 | 時刻（タイムゾーン Asia/Tokyo） | 送る内容 |
+|------|------|------|
+| 朝のまとめ | 毎日 7:47 | `{"ref": "main", "inputs": {"mode": "morning"}}` |
+| 毎時の監視 | 毎時 23分 | `{"ref": "main", "inputs": {"mode": "hourly"}}` |
+
+- `ref` は `main` 固定。`inputs` を省くと `hourly` で動く
+- 送り直しは手動のときだけ：`{"ref": "main", "inputs": {"mode": "morning", "force": "true"}}`。定期の予定には `force` を入れない（毎回送ってしまう）
+- 失敗の通知を受けられるよう、cron-job.org の失敗時の通知を有効にしておく
+
+手元から試すとき：
+
+```bash
+curl -X POST   -H "Accept: application/vnd.github+json"   -H "Authorization: Bearer $GITHUB_DISPATCH_TOKEN"   -H "X-GitHub-Api-Version: 2022-11-28"   https://api.github.com/repos/kk11121/btc-macro-monitor/actions/workflows/scheduler.yml/dispatches   -d '{"ref": "main", "inputs": {"mode": "hourly"}}'
+```
+
+### 同時に起動されたとき
+
+- ワークフローは `concurrency` で1つずつ順に流れる。各実行は始まった時点の `main` を取り直すので、前の実行が保存した `state.json` を読んでから動く
+- GitHub の仕様で、順番待ちにできるのは1件だけ。待ちの間にさらに起動されると、古い待ちは取り消される。朝のまとめが取り消されても、その日に送っていなければ後から動く予備の定時実行が送る
 
 ## ローカル実行
 
@@ -140,6 +200,7 @@ python main.py --mode morning --dry-run
 
 python main.py --mode hourly              # 実際に送信し、state.json を更新する
 python main.py --mode morning
+python main.py --mode morning --force     # その日に送信済みでも送り直す
 
 pytest tests
 ```
@@ -150,7 +211,7 @@ pytest tests
 
 | ファイル | 中身 |
 |----------|------|
-| `state.json` | 通知済みの日付、朝のまとめの基準値、失敗中の指標 |
+| `state.json` | 通知済みの日付、朝のまとめを送った日と基準値、失敗中の指標 |
 | `history/etf_flows.json` | ETF の日次の値（直近120取引日）。普段の範囲の計算に使う |
 
 - 旧形式の `state.json` は、読み込み時に自動で移行する

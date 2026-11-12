@@ -1,3 +1,5 @@
+from datetime import UTC
+
 import pytest
 
 import jobs_morning
@@ -272,3 +274,58 @@ def test_migrated_flow_without_band_still_renders(make_runtime, sender, healthy)
     }
     _run(make_runtime, state)
     assert "取引所BTC純流入 +3,837 BTC（11/3分）流入 🔴" in sender.messages[0]
+
+
+# ── 二重送信の防止 ─────────────────────────────────────────────────────────────
+
+
+def _already_sent_state():
+    return {**BASE_STATE, "summary": {**BASE_STATE["summary"], "last_date": "2026-11-05"}}
+
+
+def test_morning_already_sent_today_does_nothing(make_runtime, sender, healthy, monkeypatch):
+    ran = []
+    monkeypatch.setattr(jobs_morning, "run_daily_flows", lambda rt: ran.append("flows"))
+    rt = make_runtime(_already_sent_state())
+    jobs_morning.run_morning(rt, today="2026-11-05")
+    assert sender.messages == []
+    assert ran == []
+    assert rt.store.get("summary", "values") == BASE_STATE["summary"]["values"]
+
+
+def test_morning_force_resends_even_if_already_sent(make_runtime, sender, healthy):
+    rt = make_runtime(_already_sent_state())
+    jobs_morning.run_morning(rt, today="2026-11-05", force=True)
+    assert len(sender.messages) == 1
+    assert "朝のまとめ 11月5日(木)" in sender.messages[0]
+
+
+def test_morning_second_run_same_day_is_skipped(make_runtime, sender, healthy):
+    """外部タイマーと GitHub の定時実行が両方動いても1通だけ。"""
+    rt = _run(make_runtime)
+    jobs_morning.run_morning(rt, today="2026-11-05")
+    assert len(sender.messages) == 1
+
+
+def test_morning_send_failure_allows_retry_same_day(make_runtime, sender, healthy):
+    """送れなかった日は記録しないので、次の起動で送り直せる。"""
+    rt = make_runtime(BASE_STATE)
+    sender.fail_on = ["朝のまとめ"]
+    rt.guard("job_morning", "朝のまとめ", lambda: jobs_morning.run_morning(rt, today="2026-11-05"))
+    assert rt.store.get("summary", "last_date") == "2026-11-04"
+    sender.fail_on = []
+    jobs_morning.run_morning(rt, today="2026-11-05")
+    assert any("朝のまとめ 11月5日" in m for m in sender.messages)
+
+
+def test_morning_uses_japan_date_by_default(make_runtime, sender, healthy, monkeypatch):
+    class FixedDatetime(jobs_morning.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            # UTC 11/4 22:47 = 日本時間 11/5 7:47
+            return jobs_morning.datetime(2026, 11, 4, 22, 47, tzinfo=UTC).astimezone(tz)
+
+    monkeypatch.setattr(jobs_morning, "datetime", FixedDatetime)
+    rt = make_runtime(_already_sent_state())
+    jobs_morning.run_morning(rt)
+    assert sender.messages == []

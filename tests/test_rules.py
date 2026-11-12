@@ -141,6 +141,23 @@ def test_year_over_year_none_when_base_month_is_missing():
     assert rules.year_over_year(rows, "2026-10-01") is None
 
 
+def test_is_missing_month_inside_fetched_range():
+    rows = [{"date": "2026-10-01", "value": 340.0}, {"date": "2025-09-01", "value": 330.0}]
+    assert rules.is_missing_month(rows, "2025-10-01") is True
+
+
+def test_is_missing_month_false_when_present():
+    rows = [{"date": "2026-10-01", "value": 340.0}, {"date": "2025-10-01", "value": 330.0}]
+    assert rules.is_missing_month(rows, "2025-10-01") is False
+
+
+def test_is_missing_month_false_outside_fetched_range():
+    """取得した範囲より古い月は、欠測かどうか分からない。"""
+    rows = [{"date": "2026-10-01", "value": 340.0}, {"date": "2026-09-01", "value": 339.0}]
+    assert rules.is_missing_month(rows, "2025-10-01") is False
+    assert rules.is_missing_month([], "2025-10-01") is False
+
+
 def test_monthly_change_for_payrolls():
     rows = [
         {"date": "2026-09-01", "value": 159044},

@@ -193,8 +193,15 @@ def _status_lines(rt: Runtime) -> list[str]:
     return lines
 
 
-def run_morning(rt: Runtime, today: str | None = None) -> None:
+def run_morning(rt: Runtime, today: str | None = None, force: bool = False) -> None:
+    """
+    その日（日本時間）のまとめを送っていれば何もしない。外部タイマーと GitHub の
+    定時実行の両方から起動されても1通にするため。force なら送り直す。
+    """
     today = today or datetime.now(JST).date().isoformat()
+    if not force and rt.store.get("summary", "last_date") == today:
+        logger.info("朝のまとめ（%s）は送信済みのため終了。送り直すには --force", today)
+        return
     run_daily_flows(rt)
 
     previous = rt.store.get("summary", "values", default={})
