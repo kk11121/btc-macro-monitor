@@ -4,6 +4,7 @@ on:
   # 主な起動は外部タイマー（cron-job.org）からの workflow_dispatch。手順は README。
   # GitHub の定時実行は間引かれて数時間遅れることがあるので、予備として残す。
   # 朝のまとめは同じ日に2回目が動いても送らない（入力 force を付けたときを除く）。
+  # 発表待ち受けは毎時の監視の中で動く（その後60分以内に発表があるとき）。予定は増やさない。
   schedule:
     # 毎時0分付近は混むので実行の分をずらす
     - cron: '47 22 * * *'  # 朝のまとめ: 毎日 22:47 UTC（日本時間 7:47）
@@ -15,9 +16,9 @@ on:
         required: false
         default: 'hourly'
         type: choice
-        options: [hourly, morning]
+        options: [hourly, morning, monthly]
       force:
-        description: '朝のまとめを、その日に送信済みでも送り直す'
+        description: '朝のまとめ・月次レポートを、送信済みでも送り直す'
         required: false
         default: false
         type: boolean
@@ -25,7 +26,8 @@ on:
 permissions:
   contents: write
 
-# state.json を同時に書き換えないよう、実行を1つずつ順番に流す
+# state.json を同時に書き換えないよう、実行を1つずつ順番に流す。
+# 待ち受けで長く動くのは日本時間 20:23〜翌4:55 ごろだけで、朝のまとめ（7:47）とは重ならない
 concurrency:
   group: btc-monitor-state
   cancel-in-progress: false
@@ -33,7 +35,10 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 毎時の監視は発表待ち受け（待ち最長60分＋取得45分）を含むので120分。ほかは20分
+    timeout-minutes: >-
+      ${{ (github.event_name == 'workflow_dispatch' && inputs.mode != 'hourly') && 20
+      || (github.event.schedule == '47 22 * * *' && 20 || 120) }}
     env:
       RUN_MODE: >-
         ${{ github.event_name == 'workflow_dispatch' && inputs.mode
@@ -58,6 +63,7 @@ jobs:
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           SOSOVALUE_API_KEY: ${{ secrets.SOSOVALUE_API_KEY }}
+          BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -71,6 +77,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add state.json
           if [ -f history/etf_flows.json ]; then git add history/etf_flows.json; fi
+          if [ -d logs ]; then git add logs; fi
+          if [ -d reports ]; then git add reports; fi
           git diff --staged --quiet || git commit -m "chore: update $RUN_MODE state [skip ci]"
           for i in 1 2 3; do
             git pull --rebase origin main && git push && exit 0

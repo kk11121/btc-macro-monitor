@@ -28,3 +28,11 @@ def finite_float(value: object) -> float:
     if not math.isfinite(number):
         raise ValueError(f"non-finite value: {value!r}")
     return number
+
+
+def valid_calendar_date(text: object) -> str:
+    """YYYY-MM-DD の実在する日付を返す。発表予定日など、未来の日付を許す場面で使う。"""
+    if not isinstance(text, str) or len(text) != ISO_DATE_LENGTH:
+        raise ValueError(f"invalid date: {text!r}")
+    date.fromisoformat(text)
+    return text

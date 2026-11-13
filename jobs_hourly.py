@@ -1,29 +1,25 @@
-"""毎時の監視：VIX、FOMC、日次フロー、経済指標（経済指標は Phase B で発表待ち受けへ移す）。"""
+"""
+毎時の監視：VIX、FOMC（声明・議事録・金利見通し）、日次フロー、経済指標の予備確認、
+発表待ち受け（その後60分以内に発表があるとき）、通知後の BTC 価格の書き足し。
+"""
 
 import logging
 import os
-from datetime import datetime
-from typing import Callable
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone
 
+import alert_log
 import config
+import fomc_alerts
+import macro
 import notifier
+import release_calendar
+import release_watch
 import rules
-import summarizer
-from fetchers import coinmetrics, etf, fomc, fred, market
-from rules import Verdict
-from runtime import Runtime, redact
+from fetchers import coinmetrics, etf, market
+from runtime import Runtime
 from state_store import load_etf_history, merge_etf_rows, save_etf_history
 
 logger = logging.getLogger(__name__)
-
-JST = ZoneInfo("Asia/Tokyo")
-EASTERN = ZoneInfo("America/New_York")
-NO_FORECAST = "予想値なし（前回値と比較）"
-YOY_BASE_MISSING = "—（基準月のデータなし）"  # 2025年10月など、FRED で欠測の月が基準になるとき
-CPI_ROWS = 15     # 前年比の基準月まで届くように多めに取る
-MONTHLY_ROWS = 3  # 今月・先月・先々月
-FOMC_ACTIONS = {"lower": "利下げ", "raise": "利上げ", "maintain": "据え置き"}
 
 
 # ── VIX ───────────────────────────────────────────────────────────────────
@@ -38,213 +34,11 @@ def check_vix(rt: Runtime) -> None:
     if action == "alert":
         verdict = rules.judge_change("vix", value, baseline)
         lines = [f"VIX {value:.1f}（前回通知 {baseline:.1f}）{result['change_pct']:+.1f}%"]
-        rt.send(notifier.format_alert("VIX急騰", verdict, lines))
+        record = {"indicator": "vix", "kind": "immediate", "actual": value,
+                  "compared": {"previous": baseline}, "verdict": verdict.label}
+        rt.send(notifier.format_alert("VIX急騰", verdict, lines), record)
     if action in ("alert", "rebase", "init"):
         rt.store.set(("market", "vix"), {"value": value})
-
-
-# ── 経済指標（Phase B までは前回値との比較）────────────────────────────────
-
-
-def _release_line(key: str) -> str:
-    """対象月とは別に、発表時刻を示す行。取れなければ検知時刻を出す。"""
-    try:
-        release_date = fred.fetch_release_date(key)
-    except Exception as exc:  # 時刻が取れないだけで通知を止めない
-        logger.warning("[%s] 発表日を取得できず: %s", key, redact(str(exc)))
-        detected = datetime.now(JST)
-        return f"検知 {detected.month}/{detected.day} {detected:%H:%M}（日本時間）"
-    hour, minute = config.RELEASE_TIME_ET
-    released = (
-        datetime.fromisoformat(release_date)
-        .replace(hour=hour, minute=minute, tzinfo=EASTERN)
-        .astimezone(JST)
-    )
-    return f"発表 {released.month}/{released.day} {released:%H:%M}（日本時間）"
-
-
-def _macro_message(key: str, title: str, verdict: Verdict, lines: list[str]) -> str:
-    footer = [NO_FORECAST, _release_line(key), f"🔗 {fred.series_url(key)}"]
-    return notifier.format_alert(title, verdict, [*lines, *footer])
-
-
-def _check_release(
-    rt: Runtime,
-    key: str,
-    limit: int,
-    build_message: Callable[[list[dict], dict], str],
-) -> None:
-    """新しい対象期間が出ていたら通知して保存する。初めての指標は記録だけする。"""
-    rows = fred.fetch_observations(key, limit=limit)
-    latest = rows[0]
-    stored = rt.store.get(key, default={})
-    stored_date = stored.get("date")
-
-    if stored_date is None:
-        rt.store.set((key,), latest)
-        return
-    if latest["date"] <= stored_date:
-        logger.info("[%s] 新しいデータなし（最新 %s）", key, latest["date"])
-        return
-    rt.send(build_message(rows, stored))
-    rt.store.set((key,), latest)
-
-
-def _mom_text(rows: list[dict], date_str: str) -> str:
-    return notifier.format_signed_percent(rules.month_over_month(rows, date_str))
-
-
-def _yoy_text(rows: list[dict], date_str: str) -> str:
-    """前年比。対象月はあるのに基準月（12か月前）が欠測なら、その理由を書く。"""
-    value = rules.year_over_year(rows, date_str)
-    if value is not None:
-        return notifier.format_signed_percent(value)
-    has_target = any(row["date"] == date_str for row in rows)
-    if has_target and rules.is_missing_month(rows, rules.months_before(date_str, 12)):
-        return YOY_BASE_MISSING
-    return notifier.format_signed_percent(None)
-
-
-def _rate_line(
-    label: str, rate_text: Callable[[list[dict], str], str], rows: list[dict], date_str: str
-) -> str:
-    current = rate_text(rows, date_str)
-    previous = rate_text(rows, rules.months_before(date_str, 1))
-    return f"{label} {current}（先月 {previous}）"
-
-
-def _cpi_message(rows: list[dict], stored: dict) -> str:
-    date_str = rows[0]["date"]
-    core = fred.fetch_observations("core_cpi", limit=CPI_ROWS)
-    core_nsa = fred.fetch_observations("core_cpi_nsa", limit=CPI_ROWS)
-    headline_nsa = fred.fetch_observations("cpi_nsa", limit=CPI_ROWS)
-
-    verdict = rules.judge_change(
-        "core_cpi",
-        rules.month_over_month(core, date_str),
-        rules.month_over_month(core, rules.months_before(date_str, 1)),
-    )
-    lines = [
-        _rate_line("コア前月比", _mom_text, core, date_str) + " ← 判定に使用",
-        _rate_line("コア前年比", _yoy_text, core_nsa, date_str),
-        _rate_line("総合前月比", _mom_text, rows, date_str),
-        _rate_line("総合前年比", _yoy_text, headline_nsa, date_str),
-    ]
-    title = f"CPI（{notifier.format_month(date_str)}）"
-    return _macro_message("core_cpi", title, verdict, lines)
-
-
-def _format_jobs_change(value: float | None) -> str:
-    return "―" if value is None else f"{value:+,.0f}千人"
-
-
-def _nfp_message(rows: list[dict], stored: dict) -> str:
-    date_str = rows[0]["date"]
-    current = rules.monthly_change(rows, date_str)
-    previous = rules.monthly_change(rows, rules.months_before(date_str, 1))
-    line = (
-        f"雇用者数の増減 {_format_jobs_change(current)}"
-        f"（先月 {_format_jobs_change(previous)}）"
-    )
-    title = f"雇用統計（{notifier.format_month(date_str)}）"
-    return _macro_message("nfp", title, rules.judge_change("nfp", current, previous), [line])
-
-
-def _unrate_message(rows: list[dict], stored: dict) -> str:
-    current, previous = rows[0]["value"], stored.get("value")
-    previous_text = "―" if previous is None else f"{previous:.1f}%"
-    line = f"失業率 {current:.1f}%（前回 {previous_text}）"
-    title = f"失業率（{notifier.format_month(rows[0]['date'])}）"
-    return _macro_message("unrate", title, rules.judge_change("unrate", current, previous), [line])
-
-
-def _icsa_message(rows: list[dict], stored: dict) -> str:
-    current, previous = rows[0]["value"], stored.get("value")
-    previous_text = "―" if previous is None else f"{previous:,.0f}件"
-    line = f"申請件数 {current:,.0f}件（前回 {previous_text}）"
-    title = f"新規失業保険申請（{notifier.format_week(rows[0]['date'])}）"
-    return _macro_message("icsa", title, rules.judge_change("icsa", current, previous), [line])
-
-
-def _core_pce_message(rows: list[dict], stored: dict) -> str:
-    date_str = rows[0]["date"]
-    verdict = rules.judge_change(
-        "core_pce",
-        rules.month_over_month(rows, date_str),
-        rules.month_over_month(rows, rules.months_before(date_str, 1)),
-    )
-    line = _rate_line("コアPCE前月比", _mom_text, rows, date_str)
-    title = f"コアPCE（{notifier.format_month(date_str)}）"
-    return _macro_message("core_pce", title, verdict, [line])
-
-
-def check_cpi(rt: Runtime) -> None:
-    _check_release(rt, "cpi", CPI_ROWS, _cpi_message)
-
-
-def check_nfp(rt: Runtime) -> None:
-    _check_release(rt, "nfp", MONTHLY_ROWS, _nfp_message)
-
-
-def check_unrate(rt: Runtime) -> None:
-    _check_release(rt, "unrate", 1, _unrate_message)
-
-
-def check_icsa(rt: Runtime) -> None:
-    _check_release(rt, "icsa", 1, _icsa_message)
-
-
-def check_core_pce(rt: Runtime) -> None:
-    _check_release(rt, "core_pce", MONTHLY_ROWS, _core_pce_message)
-
-
-# ── FOMC ──────────────────────────────────────────────────────────────────
-
-
-def _is_new_document(rt: Runtime, section: str, document: dict | None) -> bool:
-    """未通知の文書なら True。初めての場合は記録だけして False を返す。"""
-    if document is None:
-        return False
-    stored_date = rt.store.get("fomc", section, "date")
-    if stored_date is None:
-        rt.store.set(("fomc", section), document)
-        return False
-    return document["date"] > stored_date
-
-
-def _check_statement(rt: Runtime, document: dict | None) -> None:
-    if not _is_new_document(rt, "statement", document):
-        return
-    decision = rules.parse_fomc_decision(fomc.fetch_content(document["url"]))
-    if decision is None:
-        decision_line = "決定を本文から読み取れませんでした"
-    else:
-        action = FOMC_ACTIONS[decision["action"]]
-        decision_line = (
-            f"決定：{action}（誘導目標 {decision['lower']:.2f}〜{decision['upper']:.2f}%）"
-        )
-    title = f"FOMC声明（{notifier.format_day(document['date'])}）"
-    lines = [decision_line, "予想値なし（市場の織り込みとの比較は未対応）", f"🔗 {document['url']}"]
-    rt.send(notifier.format_alert(title, rules.judge_fomc(decision), lines))
-    rt.store.set(("fomc", "statement"), document)
-
-
-def _check_minutes(rt: Runtime, document: dict | None) -> None:
-    if not _is_new_document(rt, "minutes", document):
-        return
-    summary = summarizer.summarize_minutes(fomc.fetch_content(document["url"]), document["date"])
-    verdict = Verdict(summary["judgment"], summary["emoji"])
-    title = f"FOMC議事録（{notifier.format_day(document['date'])}会合）"
-    rt.send(notifier.format_alert(title, verdict, [summary["summary"], f"🔗 {document['url']}"]))
-    rt.store.set(("fomc", "minutes"), document)
-
-
-def check_fomc(rt: Runtime) -> None:
-    documents = fomc.fetch_fomc_documents()
-    rt.guard(
-        "fomc_statement", "FOMC声明", lambda: _check_statement(rt, documents.get("statement"))
-    )
-    rt.guard("fomc_minutes", "FOMC議事録", lambda: _check_minutes(rt, documents.get("minutes")))
 
 
 # ── 日次フロー ─────────────────────────────────────────────────────────────
@@ -275,7 +69,10 @@ def _publish_flow(
     lines.append(f"出所：{display['source']}")
 
     title = f"{display['label']}（{notifier.format_day(latest['date'])}分）"
-    rt.send(notifier.format_alert(title, rules.judge_flow(key, value), lines))
+    verdict = rules.judge_flow(key, value)
+    record = {"indicator": key, "kind": "daily_flow", "actual": value,
+              "compared": {"band": band}, "verdict": verdict.label, "date": latest["date"]}
+    rt.send(notifier.format_alert(title, verdict, lines), record)
     rt.store.set(
         ("flows", key),
         {
@@ -369,18 +166,36 @@ def run_daily_flows(rt: Runtime) -> None:
 
 # ── 毎時の監視 ─────────────────────────────────────────────────────────────
 
-_MACRO_CHECKS = (
-    ("cpi", "CPI", check_cpi),
-    ("nfp", "雇用統計", check_nfp),
-    ("unrate", "失業率", check_unrate),
-    ("icsa", "新規失業保険申請", check_icsa),
-    ("core_pce", "コアPCE", check_core_pce),
-)
+
+def fill_alert_prices(rt: Runtime, now: datetime) -> None:
+    if rt.dry_run or rt.alert_log_path is None:
+        return
+    filled = alert_log.fill_prices(rt.alert_log_path, now)
+    logger.info("通知後の BTC 価格を %d 欄埋めました", filled)
 
 
-def run_hourly(rt: Runtime) -> None:
+def run_hourly(rt: Runtime, clock: release_watch.Clock | None = None) -> None:
+    """
+    いつもの確認を先に済ませてから、発表を待つ（待っている間に VIX などが遅れないように）。
+    予備確認は、この回の待ち受けの対象になった発表を見ない（二重通知を防ぐ）。
+    """
+    clock = clock or release_watch.Clock()
+    now = clock.now()
+    if release_calendar.is_stale(rt.store.get("calendar"), now):
+        release_calendar.refresh(rt, now)
+    due = release_watch.due_events(rt.store.state, now)
+    watched = {event["key"] for event in due}
+
     rt.guard("vix", "VIX", lambda: check_vix(rt))
-    rt.guard("fomc", "FOMC", lambda: check_fomc(rt))
+    rt.guard("fomc", "FOMC", lambda: fomc_alerts.check_documents(rt))
+    rt.guard("fomc_outlook", "FOMCの利下げ確率", lambda: fomc_alerts.check_outlook(rt, now))
     run_daily_flows(rt)
-    for key, label, check in _MACRO_CHECKS:
-        rt.guard(key, label, lambda check=check: check(rt))
+    for release, spec in config.RELEASES.items():
+        if release in watched:
+            continue
+        rt.guard(release, spec["label"], lambda release=release: macro.backup_check(rt, release))
+
+    if due:
+        release_watch.run(rt, due, clock)
+    rt.guard("alert_prices", "通知後の BTC 価格（OKX）",
+             lambda: fill_alert_prices(rt, datetime.now(timezone.utc)))

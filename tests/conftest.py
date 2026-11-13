@@ -50,3 +50,55 @@ def make_runtime(state_path, history_path, sender):
         return Runtime(store, history_path, sender=sender, dry_run=dry_run)
 
     return _make
+
+
+class _NetworkBlocked(RuntimeError):
+    pass
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch):
+    """
+    テストから外部に通信しない（ForexFactory は取りすぎると遮断されるため）。
+    個々のテストが requests.get などを差し替えた場合はそちらが優先される。
+    """
+    import requests
+
+    def blocked(*args, **kwargs):
+        raise _NetworkBlocked("network is disabled in tests")
+
+    monkeypatch.setattr(requests, "get", blocked)
+    monkeypatch.setattr(requests, "post", blocked)
+    monkeypatch.setattr(requests.Session, "request", blocked)
+
+
+@pytest.fixture(autouse=True)
+def reset_sosovalue_usage():
+    from fetchers import sosovalue
+
+    sosovalue.reset_usage()
+    yield
+    sosovalue.reset_usage()
+
+
+class FakeClock:
+    """時刻を進めるだけの時計。sleep は待たずに時刻を進める。"""
+
+    def __init__(self, start):
+        self.current = start
+        self.sleeps: list[float] = []
+
+    def now(self):
+        return self.current
+
+    def sleep(self, seconds):
+        from datetime import timedelta
+
+        self.sleeps.append(seconds)
+        if seconds > 0:
+            self.current = self.current + timedelta(seconds=seconds)
+
+
+@pytest.fixture
+def fake_clock():
+    return FakeClock

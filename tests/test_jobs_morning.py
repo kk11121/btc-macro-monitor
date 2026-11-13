@@ -42,6 +42,9 @@ BASE_STATE = {
 }
 
 MARKET = {"dxy": 102.21, "us10y": 4.99, "nasdaq": 26155.0, "vix": 16.9}
+OUTLOOK = {"meeting": "2026-12-09", "cut_prob": 0.0, "hike_prob": 84.5,
+           "expected_rate": 4.03, "horizon_meeting": "2027-03-17", "priced_bp": 32.0,
+           "as_of": "2026-11-13T02:00:00+00:00"}
 
 
 @pytest.fixture
@@ -75,6 +78,8 @@ def healthy(monkeypatch):
         ]
 
     monkeypatch.setattr(jobs_morning.fred, "fetch_observations", observations)
+    monkeypatch.setattr(jobs_morning.release_calendar, "refresh", lambda rt, now: None)
+    monkeypatch.setattr(jobs_morning.fomc_alerts, "fetch_outlook", lambda rt, now: OUTLOOK)
 
 
 def _run(make_runtime, state=None):
@@ -103,10 +108,14 @@ def test_morning_lists_all_sections(make_runtime, sender, healthy):
     assert "■ 稼働状況：すべて正常" in text
 
 
-def test_morning_does_not_carry_phase_b_sections(make_runtime, sender, healthy):
+def test_morning_carries_schedule_and_rate_outlook(make_runtime, sender, healthy):
     _run(make_runtime)
-    assert "今日・明日の予定" not in sender.messages[0]
-    assert "金利見通し" not in sender.messages[0]
+    text = sender.messages[0]
+    assert "■ 今日・明日の予定" in text
+    assert " 予定なし" in text
+    assert "■ 金利見通し（次回FOMC 12/9）" in text
+    assert " 利下げ確率 0% ／ 利上げ確率 84%" in text or " 利下げ確率 0% ／ 利上げ確率 85%" in text
+    assert "3会合先までの織り込み +32bp" in text
 
 
 def test_morning_saves_new_baselines(make_runtime, healthy):
@@ -329,3 +338,70 @@ def test_morning_uses_japan_date_by_default(make_runtime, sender, healthy, monke
     rt = make_runtime(_already_sent_state())
     jobs_morning.run_morning(rt)
     assert sender.messages == []
+
+
+# ── 予定と予想値・SoSoValue の残り回数・月次レポート（Phase B+C）──────────────
+
+
+def test_schedule_lists_today_and_tomorrow_with_forecasts(make_runtime, sender, healthy,
+                                                          monkeypatch):
+    state = {**BASE_STATE, "calendar": {
+        "fetched": "x", "releases": {"icsa": ["2026-11-05"], "cpi": ["2026-12-10"]},
+        "fomc_meetings": ["2026-11-05"]}}
+    monkeypatch.setattr(jobs_morning.forecasts.forexfactory, "fetch_week", lambda: [
+        {"title": "Unemployment Claims", "date_et": "2026-11-05", "forecast": "197K",
+         "previous": "194K"}])
+    monkeypatch.setattr(jobs_morning.forecasts.sosovalue, "fetch_event_history", lambda name: [
+        {"date": "2026-11-05", "actual": "", "forecast": "197", "previous": "194"}])
+    rt = _run(make_runtime, state)
+    text = sender.messages[0]
+    assert " 11/5 22:30 新規失業保険申請　予想：申請件数 19.7万件" in text
+    assert " 11/6 04:00 FOMC声明" in text      # 米東部 11/5 14:00（冬時間）
+    assert "CPI" not in text.split("■ 金利見通し")[0]  # 12月の CPI は載せない
+    assert rt.store.get("forecasts", "icsa")["values"]["icsa"]["sosovalue"] == 197000.0
+
+
+def test_schedule_without_forecast_says_not_yet(make_runtime, sender, healthy, monkeypatch):
+    state = {**BASE_STATE, "calendar": {"fetched": "x", "releases": {"cpi": ["2026-11-05"]}}}
+    monkeypatch.setattr(jobs_morning.forecasts.forexfactory, "fetch_week", lambda: [])
+    monkeypatch.setattr(jobs_morning.forecasts.sosovalue, "fetch_event_history", lambda name: [
+        {"date": "2026-10-14", "actual": "0.3%", "forecast": "0.2%", "previous": "0.3%"}])
+    _run(make_runtime, state)
+    assert " 11/5 22:30 CPI　予想 未発表" in sender.messages[0]
+
+
+def test_status_shows_sosovalue_remaining(make_runtime, sender, healthy):
+    state = {**BASE_STATE, "sosovalue": {"remaining_month": 8950, "limit_month": 10000,
+                                         "checked_at": "x"}}
+    _run(make_runtime, state)
+    assert "■ 稼働状況：すべて正常（SoSoValue 今月の残り 8,950回）" in sender.messages[0]
+    assert "2割" not in sender.messages[0] and "20%" not in sender.messages[0]
+
+
+def test_status_warns_below_twenty_percent(make_runtime, sender, healthy):
+    state = {**BASE_STATE, "sosovalue": {"remaining_month": 1500, "limit_month": 10000,
+                                         "checked_at": "x"}}
+    _run(make_runtime, state)
+    assert "⚠️ SoSoValue の今月の残りが上限の20%を切りました（残り 1,500回 / 10,000回）" \
+        in sender.messages[0]
+
+
+def test_monthly_report_runs_on_the_first(make_runtime, sender, healthy, monkeypatch):
+    ran = []
+    monkeypatch.setattr(jobs_morning.monthly_report, "run", lambda rt, today: ran.append(today))
+    rt = make_runtime(BASE_STATE)
+    jobs_morning.run_morning(rt, today="2026-12-01")
+    assert ran == ["2026-12-01"]
+    rt2 = make_runtime({**BASE_STATE, "summary": {**BASE_STATE["summary"], "last_date": None}})
+    jobs_morning.run_morning(rt2, today="2026-12-02")
+    assert ran == ["2026-12-01"]
+
+
+def test_morning_send_is_recorded_as_morning_kind(make_runtime, sender, healthy, tmp_path):
+    rt = make_runtime(BASE_STATE)
+    rt.alert_log_path = tmp_path / "alerts.jsonl"
+    jobs_morning.run_morning(rt, today="2026-11-05")
+    import alert_log
+
+    kinds = [r["kind"] for r in alert_log.read(rt.alert_log_path)]
+    assert "morning" in kinds

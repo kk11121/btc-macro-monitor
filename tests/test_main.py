@@ -11,6 +11,7 @@ def paths(tmp_path, monkeypatch):
     state = tmp_path / "state.json"
     monkeypatch.setattr(main, "STATE_FILE", state)
     monkeypatch.setattr(main, "ETF_HISTORY_FILE", tmp_path / "history" / "etf_flows.json")
+    monkeypatch.setattr(main, "LOG_DIR", tmp_path / "logs")
     return state
 
 
@@ -120,3 +121,22 @@ def test_force_is_ignored_for_hourly(paths, monkeypatch):
     monkeypatch.setattr(main.jobs_hourly, "run_hourly", lambda rt: ran.append("hourly"))
     assert main.main(["--mode", "hourly", "--force"]) == 0
     assert ran == ["hourly"]
+
+
+def test_monthly_mode_runs_report_with_force(paths, monkeypatch):
+    calls = []
+    monkeypatch.setattr(main.monthly_report, "run",
+                        lambda rt, today, force=False: calls.append((today, force)))
+    assert main.main(["--mode", "monthly", "--force"]) == 0
+    assert calls and calls[0][1] is True
+
+
+def test_sosovalue_usage_is_recorded_after_the_job(paths, monkeypatch):
+    def job(rt):
+        main.sosovalue._last_usage = {"remaining_month": 1500, "limit_month": 10000,
+                                      "checked_at": "x"}
+
+    monkeypatch.setattr(main.jobs_hourly, "run_hourly", job)
+    assert main.main(["--mode", "hourly"]) == 0
+    saved = json.loads(paths.read_text(encoding="utf-8"))
+    assert saved["sosovalue"]["remaining_month"] == 1500

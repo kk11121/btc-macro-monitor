@@ -9,7 +9,7 @@ Oct 30, 2026 · @草川優三
 変えること
 
 - 判定：Claudeの推測をやめ、予想値がある指標は「予想より上か下か同じか」、ない指標は「前回通知した値から上がったか下がったか」で決める
-- 予想値：SoSoValue公式APIから自動で取り、載っていない指標と障害時はForexFactory（非公式の経済指標カレンダー）で補う。どちらも取れなければエラーを通知する
+- 予想値：SoSoValue公式APIとForexFactory（非公式の経済指標カレンダー）の両方から取り、2つの予想を範囲として比べる。片方しか取れなければその1つで、両方取れなければ前回値との比較で判定する
 - FOMC：予想値の代わりに市場の織り込み（会合ごとの利下げ確率）と比べて判定する。利下げ確率は毎日追い、大きく動いたら通知する
 - 通知：即時通知は相場を動かすものだけにし、残りは毎朝1回のまとめに集める
 - 監視対象：SECの監視をやめ、コアPCEと現物BTC ETFの資金流出入を加える
@@ -50,7 +50,7 @@ Oct 30, 2026 · @草川優三
 | 恐怖&強欲指数・Funding Rate | なし | 毎日 |
 | USDT・USDC供給量、取引所BTC残高 | なし | 毎日 |
 | M2・FRBバランスシート | なし | 更新があった日 |
-| 取得エラー | 失敗の1回目と復旧時だけ | 稼働状況に一覧 |
+| 取得エラー | 失敗の1回目と復旧時だけ | 稼働状況に一覧。SoSoValueの今月の残り回数も載せ、2割を切ったら警告する |
 
 朝のまとめの見本（数値は見本）
 
@@ -73,7 +73,7 @@ Oct 30, 2026 · @草川優三
  Funding Rate（OKX）+0.010%
  USDT 181.0B ↑0.2% 🟢 ／ USDC 71.1B ↑0.1% 🟢
  取引所BTC残高 2.687M ↓0.1% 🟢
-■ 稼働状況：すべて正常
+■ 稼働状況：すべて正常（SoSoValue 今月の残り 8,950回）
 ```
 
 即時通知の見本（数値は見本）
@@ -84,7 +84,12 @@ Oct 30, 2026 · @草川優三
 コア前年比 +3.1%（予想 +3.0%）上振れ
 総合前月比 +0.3%（予想 +0.3%）一致
 総合前年比 +3.0%（予想 +2.9%）上振れ
-発表 〇/〇 22:30 ／ 予想値の出所：SoSoValue
+発表 〇/〇 22:30 ／ 予想値の出所：SoSoValue・ForexFactory
+
+【BTC Monitor】雇用統計（〇月分）🟡 中立
+NFP +6.4万人（予想 6.3万〜6.5万人）一致 ← 判定に使用
+失業率 4.2%（予想 4.2%）一致
+発表 〇/〇 22:30 ／ 予想値の出所：SoSoValue・ForexFactory
 
 【BTC Monitor】FOMC金利見通し 🟢 強気
 次回会合（〇/〇）の利下げ確率 78%（前回通知 60%）+18pt
@@ -103,26 +108,31 @@ Oct 30, 2026 · @草川優三
 
 予想値がある指標
 
-| 指標 | 判定に使う数字 | 予想より上なら | 「同じ」とみなす幅 | SoSoValue上の名前（事前確認で確定） |
+| 指標 | 判定に使う数字 | 予想より上なら | 「同じ」とみなす幅 | 名前（SoSoValue／ForexFactory） |
 | --- | --- | --- | --- | --- |
-| CPI | コアCPI前月比 | 弱気 | 小数1桁で一致 | Core CPI (MoM)。前年比は要確認 |
-| 雇用統計 | NFP（雇用者数の前月からの増減） | 弱気 | ±2.5万人 | Nonfarm Payrolls |
-| 失業率 | 失業率 | 強気 | 小数1桁で一致 | 要確認 |
-| 新規失業保険申請 | 申請件数 | 強気 | ±5,000件 | 要確認 |
-| コアPCE | コアPCE前月比 | 弱気 | 小数1桁で一致 | 要確認 |
+| CPI | コアCPI前月比 | 弱気 | 小数1桁で一致 | Core CPI (MoM)／Core CPI m/m。前年比は Core CPI (YoY)／Core CPI y/y |
+| 雇用統計 | NFP（雇用者数の前月からの増減） | 弱気 | ±2.5万人 | Nonfarm Payrolls／Non-Farm Employment Change |
+| 失業率 | 失業率 | 強気 | 小数1桁で一致 | SoSoValueになし／Unemployment Rate |
+| 新規失業保険申請 | 申請件数 | 強気 | ±5,000件 | Initial Jobless Claims／Unemployment Claims |
+| コアPCE | コアPCE前月比 | 弱気 | 小数1桁で一致 | Core PCE Price Index (MoM)／Core PCE Price Index m/m |
 | FOMC声明 | 決定後の誘導目標（範囲の中央）と、会合前の期待金利の差 | 弱気 | ±10bp | 予想値ではなく利下げ確率（/macro/fomc-probabilities）を使う |
 
+- 予想値はSoSoValueとForexFactoryの両方から取り、2つの予想を範囲として扱う。実績が2つの予想の間（それぞれの「同じとみなす幅」を含む）なら一致、高い方より上なら上振れ、低い方より下なら下振れとする。2つが同じ値なら、1つの予想と比べるのと同じ結果になる
+- 片方しか取れなかった回はその1つで判定する。両方取れなかった回は前回値との比較で判定し、「予想値なし」と明記する
+- 通知には「予想 6.3万〜6.5万人」のように範囲で表示する
 - コアCPIは前月比と前年比の両方を、予想値と並べて載せる。判定は前月比で行い、前年比が逆の結果なら「前年比は逆方向」と添える
 - 総合CPIの前月比・前年比など、判定に使わない数字も予想値と並べて表示する
 - 雇用統計はNFPで判定し、失業率が逆の結果なら「失業率は逆方向」と添える
-- 予想値が取れなかった回は前回値との比較で判定し、「予想値なし」と明記する
+- ForexFactory側のCPIとコアPCEの名前は、発表週のカレンダーで確かめる
 
 計算で押さえる点
 
 - 実績は予想値と同じ形にそろえる。CPIは指数から前月比・前年比を、NFPは雇用者数から前月からの増減を計算する
 - 前年比は季節調整なしの系列（CPIAUCNS・CPILFENS）、前月比は季節調整ありの系列（CPIAUCSL・CPILFESL）から計算する。公式発表がこの組み合わせで、崩すと0.1ずれることがある
 - 比較は公式発表と同じく小数1桁に丸めてから行う
-- SoSoValueの値は単位付きの文字列（例：CPIは "0.3%"）で返るため、数値に直してから比べる
+- SoSoValueの値は文字列で返る。CPI系・コアPCEは "0.3%" の形（整数は "0%"、負は "-0.4%"）、NFPと新規失業保険申請は千単位の数字だけ（"63" は6.3万人）。ForexFactoryは "65K" の形なので、同じ単位にそろえてから比べる
+- SoSoValueの次回分の予想は、実績が空（""）の行とする。予定一覧（/macro/events）は抜けや1日のずれがあるため使わない
+- SoSoValueの履歴が1件もなければ、指標名の誤りとしてエラーを通知する。過去の行はあるが次回の行がまだないときは、エラーにせずForexFactoryだけで判定する
 - FOMC声明の政策金利は、本文の決まり文句（maintain / lower / raise と誘導目標の範囲）から機械的に読み取る
 - 期待金利は、各金利レンジの中央値に確率を掛けて足したもの。利下げ確率は、現在の誘導目標より下のレンジの確率の合計。現在の誘導目標はFRED（DFEDTARU・DFEDTARL）から取る
 - 3会合先までの利下げ織り込み幅は、3回先の会合の期待金利と現在の誘導目標（範囲の中央）の差
@@ -149,15 +159,16 @@ Oct 30, 2026 · @草川優三
 
 ## データソース
 
-新しく加えるのは、SoSoValue公式API（予想値、FOMCの利下げ確率、現物BTC ETFの資金流出入）、実績を早く取るBLS公式API、予想値を補うForexFactoryの週次カレンダーの3つ。SECの取得はやめ、残りは今の取得先をそのまま使う。
+新しく加えるのは、SoSoValue公式API（予想値、FOMCの利下げ確率、現物BTC ETFの資金流出入）、実績を早く取るBLS公式API、予想値のもう1つの取得先になるForexFactoryの週次カレンダーの3つ。SECの取得はやめ、残りは今の取得先をそのまま使う。
 
 | データ | 取得先 | 必要なキー | 備考 |
 | --- | --- | --- | --- |
-| 予想値（新規） | SoSoValue公式API（GET /macro/events、GET /macro/events/{event}/history） | SOSOVALUE\_API\_KEY（2026年11月3日に取得済み） | 発表ごとに実績・予想・前回が返る。発表時刻は持たないため、config.pyに固定で置く（CPI・雇用統計・コアPCE・新規失業保険申請は米東部8:30、FOMC声明・議事録は14:00）。対象の指標は事前確認で確定する |
-| 予想値の補完（新規） | ForexFactory 週次カレンダーJSON | 不要 | SoSoValueに載っていない指標と、SoSoValueの障害時に使う。非公式で、項目は title・country・date・impact・forecast・previous |
-| FOMCの利下げ確率（新規） | SoSoValue公式API（GET /macro/fomc-probabilities） | SOSOVALUE\_API\_KEY | 今後約11回の会合ごとに、各金利レンジになる確率。更新はほぼ1日1回 |
+| 予想値（新規） | SoSoValue公式API（GET /macro/events/{event}/history）。ベースURLは https://openapi.sosovalue.com/openapi/v1、キーはヘッダー x-soso-api-key で送る | SOSOVALUE\_API\_KEY（取得済み） | 失業率以外の7指標が取れる（2026年11月4日に確認）。予定一覧（/macro/events）は使わない。上限は実測で1分100回・月1万回で、残り回数は応答のヘッダー（x-ratelimit-remaining-month）で分かる |
+| 予想値（新規、2つ目） | ForexFactory 週次カレンダーJSON | 不要 | 非公式で、今週分のみ。失業率の予想はこちらだけ。項目は title・country・date・impact・forecast・previous |
+| 発表日程（新規） | FRED（GET /fred/release/dates） | FRED\_API\_KEY（既存） | 公式の発表予定日。時刻は config.py に固定で置く（CPI・雇用統計・コアPCE・新規失業保険申請は米東部8:30、FOMC声明・議事録は14:00）。各発表の release\_id は実装時に確認する |
+| FOMCの利下げ確率（新規） | SoSoValue公式API（GET /macro/fomc-probabilities） | SOSOVALUE\_API\_KEY | 今後の会合ごと（11月4日時点で9回分）に、各金利レンジになる確率。会合の日付もここから取る |
 | CPI・雇用統計の実績（新規） | BLS公式API v2 | BLS\_API\_KEY（無料登録） | 発表時刻に合わせて取る。取れなければFREDで代替 |
-| 現物BTC ETFの資金流出入（新規） | SoSoValue公式API（GET /etfs/summary-history）。失敗時はTFTCで代替 | SOSOVALUE\_API\_KEY | 上限は1分20回・月10万回。項目は date・total\_net\_inflow（米ドル）など。TFTCを使った通知には出典表記が必要（CC BY 4.0） |
+| 現物BTC ETFの資金流出入（新規） | SoSoValue公式API（GET /etfs/summary-history）。失敗時はTFTCで代替 | SOSOVALUE\_API\_KEY | 項目は date・total\_net\_inflow（米ドル、数値で返る）など。TFTCを使った通知には出典表記が必要（CC BY 4.0） |
 | 新規失業保険申請、コアPCE、M2、FRBバランスシート、政策金利の誘導目標 | FRED | FRED\_API\_KEY（既存） | 誘導目標の上限・下限（DFEDTARU・DFEDTARL）を追加。残りは現状どおり |
 | FOMC声明・議事録 | federalreserve.gov | 不要 | 声明と議事録を別々に記録する |
 | DXY・米10年債・NASDAQ・VIX | Yahoo Finance（yfinance） | 不要 | 現状どおり |
@@ -167,11 +178,11 @@ Oct 30, 2026 · @草川優三
 | USDT・USDC供給量 | CoinGecko | 任意 | 現状どおり |
 | FOMC議事録の要約 | Claude API（claude-sonnet-5-5） | ANTHROPIC\_API\_KEY（既存） | 年8回だけ |
 
-ForexFactoryの取得先は `https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json` で、上記の項目は利用例で確認した（[source](https://www.mql5.com/en/forum/343908/16870225)）。今週分しか載らないため毎朝取り直し、予想値を state.json に控えておく。
+ForexFactoryの取得先は `https://nfs.faireconomy.media/ff_calendar_thisweek.json` で、項目は利用例で確認した（[source](https://www.mql5.com/en/forum/343908/16870225)）。当初の候補だった cdn-nfs.faireconomy.media は名前解決できず、来週分（ff\_calendar\_nextweek.json）は404だった（2026年11月4日の事前確認）。今週分しか載らないため毎朝取り直し、予想値を state.json に控えておく。
 
 SoSoValueのキーは開発者ダッシュボードで申請し、承認を待つ（[source](https://sosovalue.gitbook.io/soso-value-api-doc/setting-up-your-api-key.md)）。日次の合計は `GET /etfs/summary-history`（symbol=BTC、country\_code=US）で取れる（[source](https://sosovalue.gitbook.io/soso-value-api-doc/2.-etf/summary-history.md)）。代替のTFTCは同じSoSoValueのデータを無料で転載するJSON（`https://www.tftc.io/bitcoin-etf-flows/latest.json`）だが、10月30日の確認では10月28日22:00（UTC）から更新が止まっていた（[source](https://www.tftc.io/bitcoin-etf-flows/methodology)）。
 
-予想値は `GET /macro/events` で指標名と日付の一覧を取り、`GET /macro/events/{event}/history` で指標ごとの実績・予想・前回を取る（[source](https://sosovalue.gitbook.io/soso-value-api-doc/8.-macro/event-history.md)）。指標名を間違えるとエラーではなく空の結果が返るため、空ならエラーとして扱う。FOMCの利下げ確率は `GET /macro/fomc-probabilities` で、FedWatchと同じ種類のデータ（[source](https://sosovalue.gitbook.io/soso-value-api-doc/8.-macro/fomc-probabilities.md)）。
+SoSoValueの予想値は `GET /macro/events/{event}/history` で指標ごとの実績・予想・前回を取り、実績が空の行を次回分とみなす（[source](https://sosovalue.gitbook.io/soso-value-api-doc/8.-macro/event-history.md)）。指標名は事前確認で確かめた名前を config.py に固定で持つ。名前を間違えてもエラーにならず、空の結果が返る。FOMCの利下げ確率は `GET /macro/fomc-probabilities` で、FedWatchと同じ種類のデータ（[source](https://sosovalue.gitbook.io/soso-value-api-doc/8.-macro/fomc-probabilities.md)）。発表日程は FRED の `GET /fred/release/dates` で取る。標準では先の予定日が除かれるため、include\_release\_dates\_with\_no\_data=true を付けて取り、実装時に先の日付が入るか確かめる（[source](https://fred.stlouisfed.org/docs/api/fred/release_dates.html)）。事前確認の詳細は docs/sosovalue-check.md にある。
 
 ## 直す不具合
 
@@ -209,12 +220,13 @@ SoSoValueのキーは開発者ダッシュボードで申請し、承認を待�
 
 ## 実装の進め方
 
-事前確認のあと3段階に分け、各段階の動作を確かめてから次へ進む。事前確認はPhase Aと並行してよい。プロンプトを貼る前に、この設計書をMarkdownで書き出し、リポジトリに docs/redesign.md として置いておく。
+事前確認とPhase Aは済んだ。残りのPhase BとCは1回にまとめ、Phase Aを1週間ほど動かして様子を見てから入れる。通知の記録はさかのぼって取れないため、Cを後回しにせずBと一緒に始める。プロンプトを貼る前に、この設計書をMarkdownで書き出し、リポジトリに docs/redesign.md として置いておく。
 
-1. 事前確認：SoSoValueのマクロ系APIを一通り呼び、使えるか、どの指標がどの名前で載っているか、発表前に予想値が入っているかを確かめる。結果で、指標ごとの予想値の取得先（SoSoValueかForexFactoryか）を確定する
-2. Phase A 整理と不具合修正：Claude撤廃（議事録以外）、SEC監視の撤廃、不具合6件、現物BTC ETFの資金流出入の追加、日次フローの即時送信、即時通知と朝のまとめへの振り分け、予想値がない指標の判定、ジョブ構成の変更。予想値がある指標は、Phase Bまでは前回値比で判定する。確認：1週間動かし、朝のまとめが毎日届き、即時通知が1日1件未満になること
-3. Phase B 予想値・金利見通しと発表待ち受け：予想値の取得（SoSoValueを主にしForexFactoryで補う）、予想値がある指標の判定（コアPCEを含む）、FOMCの利下げ確率（朝のまとめ・即時通知・声明の判定）、朝のまとめへの予定の追加、発表待ち受けジョブ、BLS公式API。確認：次のCPIか雇用統計で、予想比つきの通知が発表から数分で届くこと
-4. Phase C 検証：通知ログ、BTC価格の書き足し、月次レポート、過去5か月分の再構成。確認：月次レポートが1回届くこと
+1. 事前確認（2026年11月4日完了。結果は docs/sosovalue-check.md）：SoSoValueのマクロ系APIを一通り呼び、使えるか、どの指標がどの名前で載っているか、発表前に予想値が入っているかを確かめた。残る確認は、CPIとコアPCEの予想値が発表の何日前に載るか
+2. Phase A 整理と不具合修正（2026年11月4日に配備。コミット 8cb19a9。報告は docs/phase-a-report.md）：Claude撤廃（議事録以外）、SEC監視の撤廃、不具合6件、現物BTC ETFの資金流出入の追加、日次フローの即時送信、即時通知と朝のまとめへの振り分け、予想値がない指標の判定、ジョブ構成の変更。予想値がある指標は、Phase Bまでは前回値比で判定する。確認：11月11日ごろまでの1週間、朝のまとめが毎日届き、即時通知が1日1件未満に収まること
+3. 外部タイマーへの切り替え（2026年11月12日に配備。コミット 158cfde。報告は docs/trigger-report.md）：GitHub の定時実行が1日約5回に間引かれ、朝のまとめが3〜5時間遅れたため、cron-job.org から workflow\_dispatch で起動する形にした。朝のまとめの二重送信防止、前年比の基準月が欠測のときの表示も入れた。確認：11月13日の朝のまとめが 7:47 に1通だけ届いた
+4. Phase B+C 予想値・金利見通し・発表待ち受けと、通知の記録：発表日程の取得（FRED）、予想値の取得（SoSoValueとForexFactoryの2つ）、予想値がある指標の判定（2つの予想を範囲として比べる。コアPCEを含む）、FOMCの利下げ確率（朝のまとめ・即時通知・声明の判定）、朝のまとめへの予定の追加、発表待ち受けジョブ、BLS公式API、SoSoValueの残り回数の監視。これに通知ログとBTC価格の書き足し、月次レポートの仕組み、過去5か月分の再構成を加える。確認：次のCPIか雇用統計で、予想比つきの通知が発表から数分で届き、通知ログに1件ずつ記録されること
+5. 最初の月次レポート：記録を始めた翌月の1日に最初の1通が届く。丸々1か月分の記録で集計したレポートは、その翌月から
 
 新しいジョブ構成（時刻はUTC）
 
@@ -222,10 +234,10 @@ SoSoValueのキーは開発者ダッシュボードで申請し、承認を待�
 | --- | --- | --- |
 | 朝のまとめ | 毎日 22:47（日本時間 7:47） | 予想値と予定の更新、全指標の取得、まとめの通知 |
 | 毎時の監視 | 毎時 23分 | VIX急騰、FOMCの利下げ確率の変化、FOMC（臨時の発表を含む）、日次フロー（ETF・取引所純流入）の新着の送信、検証用の価格の書き足し |
-| 発表待ち受け | 毎日 10:40 と 16:10 | 当日の発表があれば時刻まで待ち、30秒間隔で最長45分取りに行く |
+| 発表待ち受け | 毎時の監視に組み込む（その1時間内に発表があるとき） | 当日の発表があれば時刻まで待ち、30秒間隔で最長45分取りに行く |
 | 月次レポート | 毎月1日 0:17 | 当たり率の集計と通知 |
 
-GitHubの定時実行は毎時0分付近が混み、遅れたり実行されなかったりする（[source](https://docs.github.com/en/enterprise-server@3.15/actions/how-tos/monitoring-and-troubleshooting-workflows/troubleshooting-workflows)）。そこで実行の分をずらし、発表待ち受けは発表の1時間半以上前に起動して待つ。公開リポジトリなので、待っている時間も無料。
+GitHubの定時実行は毎時0分付近が混み、遅れたり実行されなかったりする（[source](https://docs.github.com/en/enterprise-server@3.15/actions/how-tos/monitoring-and-troubleshooting-workflows/troubleshooting-workflows)）。実績でも1日に約5回しか動かず、数時間遅れたため、2026年11月12日から外部タイマー（cron-job.org）が workflow\_dispatch で起動する形に変えた。表の時刻は予備の定時実行のもの。公開リポジトリなので、待ち受けで待っている時間も無料。
 
 事前確認のプロンプト（設計書なしでそのまま使える）
 
@@ -239,7 +251,7 @@ SoSoValue API の事前確認をしてください。既存のコードは変更
 確認すること
 1. GET /macro/events：返ってくる指標名をすべて書き出し、次の指標がどの名前で載っているかを表にする。CPI 前月比・前年比、コアCPI 前月比・前年比、雇用統計（NFP）、失業率、新規失業保険申請、コアPCE 前月比。載っていないものは「なし」と書く
 2. GET /macro/events/{event}/history：上の各指標について直近5件を取り、actual・forecast・previous の形式（単位の付き方）を記録する。まだ発表されていない回（actual が空の行）に forecast が入っているかも確かめる
-3. 2 の forecast を、ForexFactory 週次カレンダー（https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.json）の同じ指標と見比べる（今週分に載っていれば）
+3. 2 の forecast を、ForexFactory 週次カレンダー（https://nfs.faireconomy.media/ff_calendar_thisweek.json）の同じ指標と見比べる（今週分に載っていれば）
 4. GET /macro/fomc-probabilities：as_of、rate_ranges、次回会合の日付と確率を記録する。時間をおいて2回呼べるなら、as_of が変わるかも確かめる
 5. GET /etfs/summary-history（symbol=BTC、country_code=US）：最新の日付と値
 6. 各エンドポイントでエラーや制限（デモプランで使えないなど）が出たら、その内容
@@ -272,45 +284,45 @@ docs/redesign.md（改修設計書）を読んで、Phase A を実装してく�
 - 各ジョブを手動でも実行できるように残し、README を更新すること
 ```
 
-Phase B のプロンプト
+Phase B+C のプロンプト
 
 ```
-docs/redesign.md の Phase B を実装してください。docs/sosovalue-check.md（事前確認の結果）も読むこと。
+docs/redesign.md の Phase B と Phase C をまとめて実装してください。docs/sosovalue-check.md（事前確認の結果）と docs/phase-a-report.md（Phase A の報告）と docs/trigger-report.md（外部タイマー対応の報告）も読むこと。最初に git pull で最新にすること。
 
-対象
-- 予想値の取得。SoSoValue（GET /macro/events/{event}/history）を主にし、載っていない指標と障害時は ForexFactory 週次カレンダーで補う。発表時刻は config.py に固定で置く
-- 「判定ルール」の章の、予想値がある指標のルール（コアPCEを含む）
+Phase B の対象
+- 発表日程の取得（FRED の GET /fred/release/dates、include_release_dates_with_no_data=true）。時刻は config.py に固定で置き、各発表の release_id は最初に確認すること
+- 予想値の取得（SoSoValue の GET /macro/events/{event}/history と、ForexFactory 週次カレンダー https://nfs.faireconomy.media/ff_calendar_thisweek.json の両方）。SoSoValue の指標名は docs/sosovalue-check.md の名前を config.py に固定で持ち、予定一覧（/macro/events）は使わない
+- 「判定ルール」の章の、予想値がある指標のルール（2つの予想を範囲として比べる。コアPCEを含む）
 - FOMC の利下げ確率（GET /macro/fomc-probabilities）。朝のまとめへの掲載、前回通知から15ポイント以上動いたときの即時通知、FOMC 声明の判定（会合前の期待金利との差）
-- 朝のまとめへの「今日・明日の予定と予想値」の追加
-- 発表待ち受けジョブ（UTC 10:40 と 16:10 に起動し、当日の発表時刻まで待って30秒間隔で取得、最長45分）
-- CPI と雇用統計の実績は BLS 公式API v2 から取り、取れなければ FRED で代替する（Secrets に BLS_API_KEY を追加）
+- 朝のまとめへの「今日・明日の予定と予想値」と「SoSoValue の今月の残り回数」の追加
+- 発表待ち受け。別のジョブは作らず、毎時の監視に組み込む。毎時の監視が起動したとき、その後60分以内に発表があれば、発表時刻まで待ち、発表時刻から30秒間隔で取得する（最長45分）。cron-job.org の予定は増やさない。夏時間と冬時間の両方で、米国東部 8:30・10:00 の発表と FOMC 声明（14:00）を拾えることをテストで確かめること。ワークフローの timeout-minutes を待ち受けに足りる長さにし、待ち受け中に次の毎時の起動が来ても、朝のまとめが取り消されないことを確かめること。発表が出なかったときや取れなかったときは、次の回の毎時の監視で拾い、二重に通知しないこと
+- CPI と雇用統計の実績は BLS 公式API v2 から取り、取れなければ FRED で代替する（.env と Secrets の BLS_API_KEY は登録済み。最初にキーが使えるか確かめること）。新規失業保険申請とコアPCEは BLS にないため、待ち受けでは SoSoValue の実績を取りに行き、出なければ FRED で拾う。指標ごとに、発表時刻から実績が取れるまでの時間を記録すること
+
+Phase C の対象
+- logs/alerts.jsonl への全通知の記録と、1時間後・24時間後・72時間後の BTC 価格（OKX の1時間足）の書き足し。価格が取れなかった行は空欄のまま残し、次の実行で再試行する
+- 毎月1日の月次レポート（Discord と reports/YYYY-MM.md）
+- state.json の git 履歴から、2026年5月24日以降の通知の日時と指標を復元するスクリプトと、その期間の BTC 値動きの集計（結果は reports/ に保存）
+- logs/ と reports/ もワークフローでコミットされるようにする
 
 注意
 - CPI はコアの前月比・前年比と総合の前月比・前年比を載せ、判定はコア前月比で行うこと
 - 前年比は季節調整なし、前月比は季節調整ありの系列で計算し、小数1桁に丸めて比べること
-- SoSoValue の値は単位付きの文字列なので数値に直してから比べること。指標名の誤りは空の結果になるため、空ならエラーとして扱うこと
+- SoSoValue の値は文字列で、CPI 系は "0.3%"（"0%" や負の値もある）、NFP と新規失業保険申請は千単位の数字だけ。ForexFactory は "65K" の形なので、単位をそろえてから比べること
+- SoSoValue の次回分は実績が空（""）の行とする。履歴が1件もなければ指標名の誤りとしてエラー、次回の行がまだないだけならエラーにせず ForexFactory だけで判定すること
+- SoSoValue の上限は月1万回。応答ヘッダー x-ratelimit-remaining-month を記録し、2割を切ったら朝のまとめで警告すること。月の呼び出し回数の見積もりを README に書くこと
 - ForexFactory の取得は1日数回までにすること（非公式のため、取りすぎると遮断されうる）
-- 予想値や利下げ確率の取得失敗はエラー通知すること（1回目と復旧時のみ）
-- 過去の発表データで判定のテストを書くこと
-```
+- 取得失敗はエラー通知すること（1回目と復旧時のみ）
+- 過去の発表データで判定のテストを書くこと（2つの予想が一致する場合と割れる場合の両方）
+- ローカルの state.json は書き換えず、コミットにも含めないこと
 
-Phase C のプロンプト
-
-```
-docs/redesign.md の Phase C（検証）を実装してください。
-
-対象
-- logs/alerts.jsonl への全通知の記録と、1時間後・24時間後・72時間後の BTC 価格（OKX の1時間足）の書き足し
-- 毎月1日の月次レポート（Discord と reports/YYYY-MM.md）
-- state.json の git 履歴から、2026年5月24日以降の通知の日時と指標を復元するスクリプトと、その期間の BTC 値動きの集計
-
-注意
-- 価格が取れなかった行は空欄のまま残し、次の実行で再試行すること
+進め方
+- 実装の前に、変更するファイルと state.json の移行方法の一覧を docs/phase-bc-plan.md に書き出して止まること
+- 実装とテストが終わったら、報告を docs/phase-bc-report.md に書き出し、コミットとプッシュの前で止まること
 ```
 
 ## 決めたことと残るリスク
 
-未決だった点は2026年10月30日と11月3日に決めた。運用で残るリスクは6点ある。
+未決だった点は2026年10月30日・11月3日・11月4日・11月12日・11月13日に決めた。運用で残るリスクは7点ある。
 
 - CPI：コアCPIは前月比・前年比の両方を載せる。判定はコア前月比で行い、前年比が逆なら添える
 - コアPCE：即時通知に加える
@@ -318,22 +330,29 @@ docs/redesign.md の Phase C（検証）を実装してください。
 - ETF：現物BTC ETFの資金流出入を加える。取得先はSoSoValue公式APIで、TFTCは代替
 - 日次フロー：ETFと取引所純流入は、新しい日のデータが出たらすぐ送る
 - FOMCの金利見通し：利下げ確率を朝のまとめと即時通知に載せ、FOMC声明は市場の織り込みと比べて判定する（11月3日）
-- 予想値：SoSoValue公式APIを主にし、ForexFactoryで補う。指標ごとの取得先は事前確認の結果で確定する（11月3日）
+- 予想値：SoSoValueとForexFactoryの両方から取り、2つの予想を範囲として比べる。失業率はForexFactoryのみ（11月4日）
+- 発表日程：SoSoValueの予定一覧は使わず、FREDの公式の発表日程から取る（11月4日）
+- SoSoValueの空の結果：履歴が1件もなければエラー、次回の行がまだないだけならForexFactoryだけで判定する（11月4日）
+- SoSoValueの上限：実測は月1万回。残り回数を朝のまとめに載せ、2割を切ったら警告する（11月4日）
+- 進め方：Phase Aを1週間ほど様子見し、Phase BとCは1回にまとめて入れる。CPIに間に合わせるために急がない（11月4日）
+- 起動：cron-job.org から workflow\_dispatch で起動し、GitHub の定時実行は予備にする（11月12日）。発表待ち受けは別のジョブにせず毎時の監視に組み込み、その1時間内に発表があれば待って、発表時刻から30秒間隔で取りに行く。cron-job.org の予定は増やさない。毎時の監視の実行時刻を発表に合わせる案は、待ち受けの方が速いため採らない（11月13日）
 
 リスク
 
 - 予想値はSoSoValueとForexFactoryのどちらも、指標名や形式が変わりうる。両方取れないときはエラー通知を出し、前回値比の判定に切り替えて「予想値なし」と明記する
-- SoSoValueへの依存が大きい（予想値・利下げ確率・ETF）。無料のデモプランで、上限（1分20回・月10万回）や条件が変わりうる。止まったときは予想値をForexFactory、ETFをTFTCで代替し、利下げ確率は朝のまとめに取得失敗と出す。TFTCは更新が1日以上止まることがある
+- SoSoValueへの依存が大きい（予想値・利下げ確率・ETF）。無料のデモプランで、上限（実測で1分100回・月1万回。資料の記載と違った）や条件が変わりうる。止まったときは予想値をForexFactoryだけで判定し、ETFはTFTCで代替し、利下げ確率は朝のまとめに取得失敗と出す。TFTCは更新が1日以上止まることがある
+- CPIとコアPCEの予想値が、発表の何日前にSoSoValueに載るかは未確認。次のCPIの数日前から確かめる。それまでは、前日の朝のまとめに予想値が片方しか出ないことがある
 - 利下げ確率の更新はほぼ1日1回。CPIなどの直後に織り込みが動いても、通知は次の更新まで遅れることがある
 - yfinanceも非公式で、取得が止まることがある。止まった指標は朝のまとめの稼働状況に出る
 - ルール判定は予想との差の向きしか見ない。改定値や内訳、FOMCの声明文や会見の中身は判定に入らないため、大きく外れた回は自分で確かめる
-- GitHubの定時実行は遅れや欠落がある。主要指標は発表待ち受けで救えるが、毎時の監視は1時間ほど遅れうる
+- 起動は外部タイマー（cron-job.org）に頼る。cron-job.org が止まるか、トークンの期限（1年）が切れると、GitHub の定時実行だけになり数時間遅れうる。期限の前にトークンを作り直す
 
 ## 出典
 
 - [Federal Reserve: H.4.1 Factors Affecting Reserve Balances](https://www.federalreserve.gov/Releases/H41/)
 - [GitHub Docs: Troubleshooting workflows](https://docs.github.com/en/enterprise-server@3.15/actions/how-tos/monitoring-and-troubleshooting-workflows/troubleshooting-workflows)
 - [MQL5 Forum: Economic Calendar Api Recommendation?](https://www.mql5.com/en/forum/343908/16870225)
+- [FRED API: fred/release/dates](https://fred.stlouisfed.org/docs/api/fred/release_dates.html)
 - [SoSoValue API: Setting Up Your API Key](https://sosovalue.gitbook.io/soso-value-api-doc/setting-up-your-api-key.md)
 - [SoSoValue API: ETF Summary History](https://sosovalue.gitbook.io/soso-value-api-doc/2.-etf/summary-history.md)
 - [SoSoValue API: Macroeconomic Events](https://sosovalue.gitbook.io/soso-value-api-doc/8.-macro/events.md)

@@ -1,23 +1,21 @@
 """現物BTC ETFの資金流出入。SoSoValue を主とし、TFTC を代替にする。"""
 
 import logging
-import os
 
 import requests
 
+from fetchers import sosovalue
 from fetchers.validation import finite_float, valid_date
 
 logger = logging.getLogger(__name__)
 
-SOSOVALUE_URL = "https://openapi.sosovalue.com/openapi/v1/etfs/summary-history"
 TFTC_LATEST_URL = "https://www.tftc.io/bitcoin-etf-flows/latest.json"
 TFTC_HISTORY_URL = "https://www.tftc.io/bitcoin-etf-flows/data.json"
 TFTC_ATTRIBUTION = "The Commoner Bitcoin ETF Tracker by TFTC, tftc.io/bitcoin-etf-flows"
 SOSOVALUE_ROWS = 30  # 実際に返るのは直近1か月（約22行）まで
 
 
-class MissingApiKey(Exception):
-    """SOSOVALUE_API_KEY が未設定。"""
+MissingApiKey = sosovalue.MissingApiKey
 
 
 def _row(date_str: object, value: object, source: str) -> dict:
@@ -34,23 +32,13 @@ def _newest_first(rows: list[dict], source: str) -> list[dict]:
 
 def fetch_sosovalue_rows() -> list[dict]:
     """直近の日次合計を新しい順に返す。"""
-    api_key = os.environ.get("SOSOVALUE_API_KEY")
-    if not api_key:
-        raise MissingApiKey("SOSOVALUE_API_KEY is not set")
-    resp = requests.get(
-        SOSOVALUE_URL,
-        params={"symbol": "BTC", "country_code": "US", "limit": SOSOVALUE_ROWS},
-        headers={"x-soso-api-key": api_key},
-        timeout=30,
+    data = sosovalue.get(
+        "/etfs/summary-history",
+        {"symbol": "BTC", "country_code": "US", "limit": SOSOVALUE_ROWS},
     )
-    if not resp.ok:
-        raise RuntimeError(f"SoSoValue HTTP {resp.status_code}")
-    body = resp.json()
-    if body.get("code") != 0:
-        raise ValueError(f"SoSoValue error code {body.get('code')}")
     rows = [
         _row(item.get("date"), item.get("total_net_inflow"), "sosovalue")
-        for item in body.get("data") or []
+        for item in data or []
     ]
     return _newest_first(rows, "SoSoValue")
 

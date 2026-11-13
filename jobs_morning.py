@@ -2,15 +2,21 @@
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 import config
+import fomc_alerts
+import forecasts
+import macro
+import monthly_report
 import notifier
+import release_calendar
 import rules
-from fetchers import coinmetrics, etf, fred, glassnode, market, stablecoin
+from fetchers import coinmetrics, etf, fred, glassnode, market, sosovalue, stablecoin
 from jobs_hourly import run_daily_flows
+from release_watch import Clock
 from runtime import Runtime
 
 logger = logging.getLogger(__name__)
@@ -182,18 +188,98 @@ def _liquidity_lines(rt: Runtime, updates: dict) -> list[str]:
     return lines
 
 
-def _status_lines(rt: Runtime) -> list[str]:
-    errors = rt.store.get("errors", default={})
-    if not errors:
-        return ["■ 稼働状況：すべて正常"]
-    lines = [f"■ 稼働状況：失敗中 {len(errors)}件"]
-    for entry in errors.values():
-        since = datetime.fromisoformat(entry["since"]).astimezone(JST)
-        lines.append(f" ・{entry['label']}（{since.month}/{since.day}から）")
+# ── 今日・明日の予定 ───────────────────────────────────────────────────────
+
+_SCHEDULE_FORECASTS = {
+    "cpi": (("core_cpi_mom", "コア前月比"), ("core_cpi_yoy", "コア前年比")),
+    "employment": (("nfp", "NFP"), ("unrate", "失業率")),
+    "icsa": (("icsa", "申請件数"),),
+    "core_pce": (("core_pce_mom", "コアPCE前月比"),),
+}
+
+
+def _forecast_text(metric: str, metric_values: dict) -> str | None:
+    values = sorted(forecasts.available(metric_values).values())
+    if not values:
+        return None
+    result = rules.ForecastResult("match", rules.NEUTRAL, values[0], values[-1])
+    return macro.range_text(metric, result)
+
+
+def _schedule_line(event: dict, values: dict) -> str:
+    at = event["at"].astimezone(JST)
+    head = f" {at.month}/{at.day} {at:%H:%M} {event['label']}"
+    pairs = _SCHEDULE_FORECASTS.get(event["key"])
+    if pairs is None:
+        return head
+    texts = [f"{label} {text}" for metric, label in pairs
+             if (text := _forecast_text(metric, values.get(metric))) is not None]
+    return f"{head}　予想：{'、'.join(texts)}" if texts else f"{head}　予想 未発表"
+
+
+def _schedule_lines(rt: Runtime, now: datetime, today: str) -> list[str]:
+    """日本時間の今日・明日の発表。予想値はこの時点で取り直して控える。"""
+    start = datetime.fromisoformat(f"{today}T00:00:00").replace(tzinfo=JST)
+    events = release_calendar.events_between(rt.store.state, start, start + timedelta(days=2))
+    collector = forecasts.Collector(rt.guard)
+    lines = ["■ 今日・明日の予定"]
+    for event in events:
+        values: dict = {}
+        if event["key"] in config.RELEASES:
+            collected = forecasts.merge(rt.store.get("forecasts", event["key"]),
+                                        collector.collect(event["key"], event["date_et"]))
+            rt.store.set(("forecasts", event["key"]), collected)
+            values = collected["values"]
+        lines.append(_schedule_line(event, values))
+    if not events:
+        lines.append(" 予定なし")
     return lines
 
 
-def run_morning(rt: Runtime, today: str | None = None, force: bool = False) -> None:
+def _outlook_lines(rt: Runtime, now: datetime, today: str) -> list[str]:
+    box: list[list[str]] = []
+    rt.guard("fomc_outlook_morning", "FOMCの利下げ確率（朝のまとめ）",
+             lambda: box.append(fomc_alerts.morning_lines(rt, now, today)))
+    return box[0] if box else ["■ 金利見通し", " 取得失敗"]
+
+
+# ── 稼働状況 ───────────────────────────────────────────────────────────────
+
+
+def _usage(rt: Runtime) -> dict | None:
+    return sosovalue.last_usage() or rt.store.get("sosovalue")
+
+
+def _usage_text(usage: dict | None) -> str:
+    if not usage or usage.get("remaining_month") is None:
+        return ""
+    return f"（SoSoValue 今月の残り {usage['remaining_month']:,}回）"
+
+
+def _usage_warning(usage: dict | None) -> list[str]:
+    if not usage or not usage.get("limit_month") or usage.get("remaining_month") is None:
+        return []
+    if usage["remaining_month"] >= usage["limit_month"] * config.SOSOVALUE_WARN_RATIO:
+        return []
+    return [f" ⚠️ SoSoValue の今月の残りが上限の{config.SOSOVALUE_WARN_RATIO:.0%}を切りました"
+            f"（残り {usage['remaining_month']:,}回 / {usage['limit_month']:,}回）"]
+
+
+def _status_lines(rt: Runtime) -> list[str]:
+    errors = rt.store.get("errors", default={})
+    usage = _usage(rt)
+    if not errors:
+        return [f"■ 稼働状況：すべて正常{_usage_text(usage)}", *_usage_warning(usage)]
+    lines = [f"■ 稼働状況：失敗中 {len(errors)}件{_usage_text(usage)}"]
+    for entry in errors.values():
+        since = datetime.fromisoformat(entry["since"]).astimezone(JST)
+        lines.append(f" ・{entry['label']}（{since.month}/{since.day}から）")
+    return [*lines, *_usage_warning(usage)]
+
+
+def run_morning(
+    rt: Runtime, today: str | None = None, force: bool = False, clock: Clock | None = None
+) -> None:
     """
     その日（日本時間）のまとめを送っていれば何もしない。外部タイマーと GitHub の
     定時実行の両方から起動されても1通にするため。force なら送り直す。
@@ -203,6 +289,11 @@ def run_morning(rt: Runtime, today: str | None = None, force: bool = False) -> N
         logger.info("朝のまとめ（%s）は送信済みのため終了。送り直すには --force", today)
         return
     run_daily_flows(rt)
+    now = (clock or Clock()).now()
+    if release_calendar.is_stale(rt.store.get("calendar"), now):
+        release_calendar.refresh(rt, now)
+    schedule_lines = _schedule_lines(rt, now, today)
+    outlook_lines = _outlook_lines(rt, now, today)
 
     previous = rt.store.get("summary", "values", default={})
     fresh: dict = {}
@@ -213,6 +304,8 @@ def run_morning(rt: Runtime, today: str | None = None, force: bool = False) -> N
 
     sections = [
         f"**【BTC Monitor】朝のまとめ {notifier.format_long_date(today)}**",
+        *schedule_lines,
+        *outlook_lines,
         "■ マクロ・市場（前回まとめ比）",
         *market_lines,
         "■ 暗号資産",
@@ -221,9 +314,11 @@ def run_morning(rt: Runtime, today: str | None = None, force: bool = False) -> N
     if liquidity_lines:
         sections += ["■ 流動性（前回の発表比）", *liquidity_lines]
     sections += _status_lines(rt)
-    rt.send("\n".join(sections))
+    rt.send("\n".join(sections), {"indicator": "morning_summary", "kind": "morning"})
 
     # 送れた場合だけ基準を進める。送信に失敗したら次回も同じ比較でやり直せる
     rt.store.set(("summary",), {"last_date": today, "values": {**previous, **fresh}})
     for key, latest in liquidity_updates.items():
         rt.store.set(("liquidity", key), latest)
+    if today.endswith("-01"):
+        rt.guard("monthly_report", "月次レポート", lambda: monthly_report.run(rt, today))

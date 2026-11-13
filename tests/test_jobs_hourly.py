@@ -1,4 +1,4 @@
-import pytest
+from datetime import datetime, timezone
 
 import jobs_hourly
 from state_store import load_etf_history, save_etf_history
@@ -6,11 +6,6 @@ from state_store import load_etf_history, save_etf_history
 
 def obs(*pairs):
     return [{"date": d, "value": v} for d, v in pairs]
-
-
-@pytest.fixture(autouse=True)
-def fixed_release(monkeypatch):
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_release_date", lambda key: "2026-10-14")
 
 
 # ── VIX ───────────────────────────────────────────────────────────────────────
@@ -53,302 +48,6 @@ def test_vix_send_failure_keeps_baseline_for_retry(make_runtime, sender, monkeyp
     rt.guard("vix", "VIX", lambda: jobs_hourly.check_vix(rt))
     assert rt.notification_failed is True
     assert rt.store.get("market", "vix", "value") == 20.0
-
-
-# ── 経済指標 ───────────────────────────────────────────────────────────────────
-
-
-def _months(end_value, step, count=14, year=2026, month=9):
-    """月初の日付で count か月分（新しい順）を作る。"""
-    rows, value = [], end_value
-    for _ in range(count):
-        rows.append({"date": f"{year}-{month:02d}-01", "value": round(value, 3)})
-        value -= step
-        month -= 1
-        if month == 0:
-            month, year = 12, year - 1
-    return rows
-
-
-def _cpi_series(monkeypatch):
-    series = {
-        "cpi": _months(336.3, 0.3),
-        "cpi_nsa": _months(336.0, 0.3),
-        "core_cpi": _months(338.9, 1.0),
-        "core_cpi_nsa": _months(338.0, 0.3),
-    }
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
-
-
-def test_cpi_shows_target_month_release_time_and_no_forecast(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"cpi": {"date": "2026-08-01", "value": 336.0}})
-    _cpi_series(monkeypatch)
-    jobs_hourly.check_cpi(rt)
-    text = sender.messages[0]
-    assert "CPI（9月分）" in text
-    assert "2026-09-01" not in text
-    assert "予想値なし" in text
-    assert "発表 10/14 21:30" in text
-    assert "コア前月比" in text and "コア前年比" in text
-    assert "総合前月比" in text and "総合前年比" in text
-    assert "← 判定に使用" in text
-    assert rt.store.get("cpi", "date") == "2026-09-01"
-
-
-def test_cpi_judges_core_mom_against_previous_mom(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"cpi": {"date": "2026-08-01", "value": 336.0}})
-    series = {
-        "cpi": _months(336.3, 0.3),
-        "cpi_nsa": _months(336.0, 0.3),
-        "core_cpi": obs(
-            ("2026-09-01", 101.0), ("2026-08-01", 100.0), ("2026-07-01", 99.8)
-        ),
-        "core_cpi_nsa": _months(338.0, 0.3),
-    }
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
-    jobs_hourly.check_cpi(rt)
-    assert "🔴 弱気" in sender.messages[0]  # 前月比 +1.0% > 先月 +0.2%
-
-
-def test_cpi_missing_yoy_base_month_does_not_fail(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"cpi": {"date": "2026-09-01", "value": 336.0}})
-    gap = [r for r in _months(340.0, 0.3, month=10) if r["date"] != "2025-10-01"]
-    series = {"cpi": gap, "cpi_nsa": gap, "core_cpi": gap, "core_cpi_nsa": gap}
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
-    jobs_hourly.check_cpi(rt)
-    text = sender.messages[0]
-    assert "コア前年比 —（基準月のデータなし）（先月 +" in text
-    assert "総合前年比 —（基準月のデータなし）（先月 +" in text
-    assert "コア前月比 +" in text  # 前月比は影響を受けない
-
-
-def test_cpi_previous_month_yoy_with_missing_base_is_labeled(make_runtime, sender, monkeypatch):
-    """11月分では、先月（10月分）の前年比の基準月が欠測になる。"""
-    rt = make_runtime({"cpi": {"date": "2026-10-01", "value": 336.0}})
-    months = _months(340.0, 0.3, count=jobs_hourly.CPI_ROWS, month=11)
-    gap = [r for r in months if r["date"] != "2025-10-01"]
-    series = {"cpi": gap, "cpi_nsa": gap, "core_cpi": gap, "core_cpi_nsa": gap}
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
-    jobs_hourly.check_cpi(rt)
-    text = sender.messages[0]
-    assert "コア前年比 +" in text
-    assert "（先月 —（基準月のデータなし））" in text
-
-
-def test_cpi_yoy_outside_fetched_range_is_not_labeled_as_missing(
-    make_runtime, sender, monkeypatch
-):
-    """取得範囲が足りないだけのときは、基準月の欠測とは書かない。"""
-    rt = make_runtime({"cpi": {"date": "2026-08-01", "value": 336.0}})
-    short = _months(340.0, 0.3, count=3)
-    series = {"cpi": short, "cpi_nsa": short, "core_cpi": short, "core_cpi_nsa": short}
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: series[key])
-    jobs_hourly.check_cpi(rt)
-    text = sender.messages[0]
-    assert "コア前年比 ―（先月 ―）" in text
-    assert "基準月のデータなし" not in text
-
-
-def test_cpi_same_date_is_silent(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"cpi": {"date": "2026-09-01", "value": 336.0}})
-    _cpi_series(monkeypatch)
-    jobs_hourly.check_cpi(rt)
-    assert sender.messages == []
-
-
-def test_nfp_compares_monthly_change(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"nfp": {"date": "2026-08-01", "value": 159015}})
-    rows = obs(("2026-09-01", 159044), ("2026-08-01", 159015), ("2026-07-01", 158853))
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: rows)
-    jobs_hourly.check_nfp(rt)
-    text = sender.messages[0]
-    assert "雇用統計（9月分）" in text
-    assert "+29千人" in text and "+162千人" in text
-    assert "🟢 強気" in text  # 増減が先月より縮小
-    assert rt.store.get("nfp", "value") == 159044
-
-
-def test_unrate_compares_level_with_previous_notice(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"unrate": {"date": "2026-08-01", "value": 4.2}})
-    monkeypatch.setattr(
-        jobs_hourly.fred, "fetch_observations", lambda key, limit=1: obs(("2026-09-01", 4.3))
-    )
-    jobs_hourly.check_unrate(rt)
-    assert "失業率（9月分）" in sender.messages[0]
-    assert "🟢 強気" in sender.messages[0]
-    assert "4.3%" in sender.messages[0] and "4.2%" in sender.messages[0]
-
-
-def test_icsa_compares_level_and_uses_week_label(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"icsa": {"date": "2026-10-17", "value": 199000}})
-    monkeypatch.setattr(
-        jobs_hourly.fred, "fetch_observations", lambda key, limit=1: obs(("2026-10-24", 194000))
-    )
-    jobs_hourly.check_icsa(rt)
-    assert "新規失業保険申請（10/24週）" in sender.messages[0]
-    assert "🟡 中立" in sender.messages[0]  # ±5,000件の幅に収まる
-    assert "194,000件" in sender.messages[0]
-
-
-def test_core_pce_first_run_is_recorded_silently(make_runtime, sender, monkeypatch):
-    rt = make_runtime({})
-    rows = obs(("2026-09-01", 128.0), ("2026-08-01", 127.6), ("2026-07-01", 127.4))
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: rows)
-    jobs_hourly.check_core_pce(rt)
-    assert sender.messages == []
-    assert rt.store.get("core_pce", "date") == "2026-09-01"
-
-
-def test_core_pce_new_release_compares_mom(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"core_pce": {"date": "2026-08-01", "value": 127.6}})
-    rows = obs(("2026-09-01", 128.0), ("2026-08-01", 127.6), ("2026-07-01", 127.4))
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", lambda key, limit=1: rows)
-    jobs_hourly.check_core_pce(rt)
-    assert "コアPCE（9月分）" in sender.messages[0]
-    assert "🔴 弱気" in sender.messages[0]
-    assert "予想値なし" in sender.messages[0]
-
-
-def test_release_date_failure_falls_back_to_detected_time(make_runtime, sender, monkeypatch):
-    rt = make_runtime({"unrate": {"date": "2026-08-01", "value": 4.2}})
-
-    def fail(key):
-        raise RuntimeError("down")
-
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_release_date", fail)
-    monkeypatch.setattr(
-        jobs_hourly.fred, "fetch_observations", lambda key, limit=1: obs(("2026-09-01", 4.3))
-    )
-    jobs_hourly.check_unrate(rt)
-    assert "検知 " in sender.messages[0]
-    assert "発表 " not in sender.messages[0]
-
-
-# ── FOMC ──────────────────────────────────────────────────────────────────────
-
-STATEMENT = {"url": "https://x/monetary20261209a.htm", "date": "2026-12-09"}
-MINUTES = {"url": "https://x/fomcminutes20261028.htm", "date": "2026-10-28"}
-
-
-def _fomc(monkeypatch, statement=STATEMENT, minutes=MINUTES, content="本文"):
-    monkeypatch.setattr(
-        jobs_hourly.fomc,
-        "fetch_fomc_documents",
-        lambda: {"statement": statement, "minutes": minutes},
-    )
-    monkeypatch.setattr(jobs_hourly.fomc, "fetch_content", lambda url: content)
-
-
-def _state_fomc(statement_date="2026-10-28", minutes_date="2026-09-16"):
-    return {
-        "fomc": {
-            "statement": {"url": "https://x/old", "date": statement_date},
-            "minutes": {"url": "https://x/old", "date": minutes_date},
-        }
-    }
-
-
-def test_statement_is_judged_from_the_text(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(minutes_date="2026-10-28"))
-    _fomc(
-        monkeypatch,
-        content="The Committee decided to lower the target range for the federal funds rate "
-        "by 1/4 percentage point to 3-1/2 to 3-3/4 percent.",
-    )
-    jobs_hourly.check_fomc(rt)
-    assert len(sender.messages) == 1
-    text = sender.messages[0]
-    assert "FOMC声明" in text
-    assert "🟢 強気" in text
-    assert "3.50〜3.75%" in text
-    assert "予想値なし" in text
-    assert rt.store.get("fomc", "statement", "date") == "2026-12-09"
-
-
-def test_statement_unreadable_is_unknown_but_still_sent(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(minutes_date="2026-10-28"))
-    _fomc(monkeypatch, content="something else")
-    jobs_hourly.check_fomc(rt)
-    assert "⚪ 判定不可" in sender.messages[0]
-    assert rt.store.get("fomc", "statement", "date") == "2026-12-09"
-
-
-def test_minutes_are_sent_separately_from_statement(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(statement_date="2026-12-09"))
-    _fomc(monkeypatch)
-    monkeypatch.setattr(
-        jobs_hourly.summarizer,
-        "summarize_minutes",
-        lambda content, date: {"judgment": "弱気", "emoji": "🔴", "summary": "要約"},
-    )
-    jobs_hourly.check_fomc(rt)
-    assert len(sender.messages) == 1
-    assert "FOMC議事録（10/28会合）" in sender.messages[0]
-    assert "要約" in sender.messages[0]
-    assert rt.store.get("fomc", "minutes", "date") == "2026-10-28"
-
-
-def test_minutes_summary_failure_shows_unknown(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(statement_date="2026-12-09"))
-    _fomc(monkeypatch, content=None)
-    jobs_hourly.check_fomc(rt)
-    assert "⚪ 判定不可" in sender.messages[0]
-
-
-def _fetch_content_fails(monkeypatch):
-    def fail(url):
-        raise RuntimeError("503")
-
-    monkeypatch.setattr(jobs_hourly.fomc, "fetch_content", fail)
-
-
-def test_statement_page_failure_does_not_advance_and_retries(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(minutes_date="2026-10-28"))
-    _fomc(monkeypatch)
-    _fetch_content_fails(monkeypatch)
-    jobs_hourly.check_fomc(rt)
-    assert rt.store.get("fomc", "statement", "date") == "2026-10-28"
-    assert "fomc_statement" in rt.store.get("errors")
-    assert not any("判定不可" in m for m in sender.messages)
-
-
-def test_minutes_page_failure_does_not_advance_and_retries(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc(statement_date="2026-12-09"))
-    _fomc(monkeypatch)
-    _fetch_content_fails(monkeypatch)
-    jobs_hourly.check_fomc(rt)
-    assert rt.store.get("fomc", "minutes", "date") == "2026-09-16"
-    assert "fomc_minutes" in rt.store.get("errors")
-
-
-def test_minutes_first_run_is_recorded_silently(make_runtime, sender, monkeypatch):
-    state = _state_fomc(statement_date="2026-12-09")
-    state["fomc"]["minutes"] = {"url": None, "date": None}
-    rt = make_runtime(state)
-    _fomc(monkeypatch)
-
-    def must_not_run(content, date):
-        raise AssertionError("初回の議事録は要約しない")
-
-    monkeypatch.setattr(jobs_hourly.summarizer, "summarize_minutes", must_not_run)
-    jobs_hourly.check_fomc(rt)
-    assert sender.messages == []
-    assert rt.store.get("fomc", "minutes", "date") == "2026-10-28"
-
-
-def test_statement_send_failure_does_not_block_minutes(make_runtime, sender, monkeypatch):
-    rt = make_runtime(_state_fomc())
-    _fomc(monkeypatch)
-    monkeypatch.setattr(
-        jobs_hourly.summarizer,
-        "summarize_minutes",
-        lambda content, date: {"judgment": "中立", "emoji": "🟡", "summary": "要約"},
-    )
-    sender.fail_on = ["FOMC声明"]
-    jobs_hourly.check_fomc(rt)
-    assert rt.store.get("fomc", "statement", "date") == "2026-10-28"  # 次回やり直す
-    assert rt.store.get("fomc", "minutes", "date") == "2026-10-28"
-    assert rt.notification_failed is True
 
 
 # ── 日次フロー ─────────────────────────────────────────────────────────────────
@@ -581,12 +280,13 @@ def test_exchange_netflow_same_day_is_silent(make_runtime, sender, monkeypatch):
 # ── 毎時の監視全体 ─────────────────────────────────────────────────────────────
 
 
-def test_run_hourly_isolates_each_indicator(make_runtime, sender, monkeypatch):
+def test_run_hourly_isolates_each_indicator(make_runtime, sender, monkeypatch, fake_clock):
     rt = make_runtime(
         {
             "market": {"vix": {"value": 20.0}},
-            "unrate": {"date": "2026-08-01", "value": 4.2},
+            "icsa": {"date": "2026-10-31", "value": 194000.0, "release": None},
             "flows": {"exchange_netflow": {"date": "2026-11-02", "value": 1.0}},
+            "calendar": {"fetched": "2026-11-13T00:00:00+00:00", "releases": {}},
         }
     )
 
@@ -594,21 +294,51 @@ def test_run_hourly_isolates_each_indicator(make_runtime, sender, monkeypatch):
         raise RuntimeError("down")
 
     monkeypatch.setattr(jobs_hourly.market, "fetch_market", fail)
-    monkeypatch.setattr(jobs_hourly.fomc, "fetch_fomc_documents", fail)
+    monkeypatch.setattr(jobs_hourly.fomc_alerts.fomc, "fetch_fomc_documents", fail)
+    monkeypatch.setattr(jobs_hourly.fomc_alerts.fomc_outlook, "fetch", fail)
     monkeypatch.setattr(jobs_hourly.etf, "fetch_sosovalue_rows", fail)
     monkeypatch.setattr(jobs_hourly.etf, "fetch_tftc_latest_rows", fail)
     _netflow(monkeypatch)
 
     def observations(key, limit=1):
-        if key == "unrate":
-            return obs(("2026-09-01", 4.3))
+        if key == "icsa":
+            return obs(("2026-11-07", 200000.0), ("2026-10-31", 194000.0))
         raise RuntimeError("down")
 
-    monkeypatch.setattr(jobs_hourly.fred, "fetch_observations", observations)
+    monkeypatch.setattr(jobs_hourly.macro.fred, "fetch_observations", observations)
+    monkeypatch.setattr(jobs_hourly.macro.fred, "fetch_release_date", lambda key: "2026-11-12")
     monkeypatch.setenv("SOSOVALUE_API_KEY", "x")
-    jobs_hourly.run_hourly(rt)
+    clock = fake_clock(datetime(2026, 11, 13, 3, 23, tzinfo=timezone.utc))
+    jobs_hourly.run_hourly(rt, clock)
     joined = "\n".join(sender.messages)
     assert "取引所BTC純流入（11/3分）" in joined
-    assert "失業率（9月分）" in joined
-    assert rt.store.get("unrate", "date") == "2026-09-01"
+    assert "新規失業保険申請（11/7週）" in joined
+    assert rt.store.get("icsa", "release") == "2026-11-12"
     assert "vix" in rt.store.get("errors")
+    assert clock.sleeps == []  # 発表がないので待たない
+
+
+def test_run_hourly_skips_backup_for_watched_release_and_waits(
+    make_runtime, sender, monkeypatch, fake_clock
+):
+    """待ち受けの対象になった発表は、予備確認では見ない（待ち受けが拾う）。"""
+    rt = make_runtime({
+        "market": {"vix": {"value": 20.0}},
+        "icsa": {"date": "2026-11-07", "value": 200000.0, "release": "2026-11-12"},
+        "calendar": {"fetched": "2026-11-19T13:00:00+00:00", "releases": {"icsa": ["2026-11-19"]}},
+    })
+    calls = []
+    monkeypatch.setattr(jobs_hourly.market, "fetch_market", lambda key: {"value": 20.0})
+    monkeypatch.setattr(jobs_hourly.fomc_alerts, "check_documents", lambda rt: None)
+    monkeypatch.setattr(jobs_hourly.fomc_alerts, "check_outlook", lambda rt, now: None)
+    monkeypatch.setattr(jobs_hourly, "run_daily_flows", lambda rt: None)
+    monkeypatch.setattr(jobs_hourly.macro, "backup_check",
+                        lambda rt, release: calls.append(release))
+    watched = []
+    monkeypatch.setattr(jobs_hourly.release_watch, "run",
+                        lambda rt, events, clock: watched.extend(e["key"] for e in events))
+    clock = fake_clock(datetime(2026, 11, 19, 13, 23, tzinfo=timezone.utc))  # 米東部 8:23
+    jobs_hourly.run_hourly(rt, clock)
+    assert "icsa" not in calls
+    assert set(calls) == {"cpi", "employment", "core_pce"}
+    assert watched == ["icsa"]

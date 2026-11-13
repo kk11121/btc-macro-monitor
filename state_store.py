@@ -9,16 +9,20 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _NULL_DATED = {"date": None, "value": None}
+# 経済指標は、通知した発表日（release）も持つ（発表待ち受けと予備確認の二重通知を防ぐ）
+_NULL_RELEASE = {"date": None, "value": None, "release": None}
+MACRO_KEYS = ("cpi", "nfp", "unrate", "icsa", "core_pce")
+RENAMED_ERROR_KEYS = ("nfp", "unrate")  # Phase B で「employment」（雇用統計）にまとめた
 _DEFAULT_STATE: dict = {
     "schema_version": SCHEMA_VERSION,
-    "cpi": _NULL_DATED,
-    "nfp": _NULL_DATED,
-    "unrate": _NULL_DATED,
-    "icsa": _NULL_DATED,
-    "core_pce": _NULL_DATED,
+    "cpi": _NULL_RELEASE,
+    "nfp": _NULL_RELEASE,
+    "unrate": _NULL_RELEASE,
+    "icsa": _NULL_RELEASE,
+    "core_pce": _NULL_RELEASE,
     "fomc": {
         "statement": {"url": None, "date": None},
         "minutes": {"url": None, "date": None},
@@ -31,6 +35,12 @@ _DEFAULT_STATE: dict = {
     },
     "summary": {"last_date": None, "values": {}},
     "errors": {},
+    "calendar": {"fetched": None, "releases": {}, "fomc_meetings": []},
+    "forecasts": {},
+    "fomc_outlook": {"morning": None, "notified": None, "latest": None, "pre_meeting": {}},
+    "fed_target": None,
+    "sosovalue": {"remaining_month": None, "limit_month": None, "checked_at": None},
+    "monthly": {"last_month": None},
 }
 
 
@@ -94,8 +104,9 @@ def migrate(raw: dict) -> dict:
     旧キーを書き戻しても、次の読み込みで取り込める。何度実行しても結果は同じ。
     """
     state = copy.deepcopy(raw)
-    # 旧形式のときだけ写す。新形式の market.vix は毎時の通知の基準で、朝の基準とは別物
-    is_legacy = state.get("schema_version") != SCHEMA_VERSION
+    # 旧形式（schema_version がない）のときだけ写す。
+    # 新形式の market.vix は毎時の通知の基準で、朝の基準とは別物
+    is_legacy = "schema_version" not in state
     baselines = _legacy_baselines(state) if is_legacy else {}
     summary = state.get("summary", {})
     values = {**baselines, **summary.get("values", {})}
@@ -110,6 +121,10 @@ def migrate(raw: dict) -> dict:
     migrated["schema_version"] = SCHEMA_VERSION
     for key, default in _DEFAULT_STATE.items():
         migrated.setdefault(key, copy.deepcopy(default))
+    for key in MACRO_KEYS:
+        migrated[key] = {"release": None, **migrated[key]}
+    migrated["errors"] = {k: v for k, v in migrated["errors"].items()
+                          if k not in RENAMED_ERROR_KEYS}
     return migrated
 
 

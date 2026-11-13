@@ -44,8 +44,9 @@ LEGACY = {
 
 def test_migrate_keeps_macro_entries_untouched():
     state = migrate(LEGACY)
-    for key in ("cpi", "nfp", "unrate", "icsa", "liquidity"):
-        assert state[key] == LEGACY[key]
+    for key in ("cpi", "nfp", "unrate", "icsa"):
+        assert state[key] == {**LEGACY[key], "release": None}
+    assert state["liquidity"] == LEGACY["liquidity"]
 
 
 def test_migrate_splits_fomc_and_leaves_minutes_for_silent_seed():
@@ -84,7 +85,7 @@ def test_migrate_removes_only_legacy_sections():
         assert key not in state
     assert state["schema_version"] == SCHEMA_VERSION
     assert state["errors"] == {}
-    assert state["core_pce"] == {"date": None, "value": None}
+    assert state["core_pce"] == {"date": None, "value": None, "release": None}
 
 
 def test_migrate_does_not_mutate_input():
@@ -218,3 +219,46 @@ def test_etf_history_roundtrip_creates_directory(history_path):
 
 def test_etf_history_missing_file_gives_empty(history_path):
     assert load_etf_history(history_path) == {"backfilled": False, "rows": []}
+
+
+# ── schema_version 2 → 3（Phase B+C）─────────────────────────────────────────
+
+V2 = {
+    "schema_version": 2,
+    "cpi": {"date": "2026-10-01", "value": 337.476},
+    "nfp": {"date": "2026-10-01", "value": 159293.0},
+    "market": {"vix": {"value": 17.5}},
+    "summary": {"last_date": "2026-11-12", "values": {"dxy": 103.0}},
+    "errors": {"nfp": {"label": "雇用統計", "since": "2026-11-10T00:00:00+00:00"},
+               "dxy": {"label": "DXY", "since": "2026-11-10T00:00:00+00:00"}},
+}
+
+
+def test_v2_to_v3_adds_new_sections_without_losing_data():
+    state = migrate(V2)
+    assert state["schema_version"] == 3
+    assert state["cpi"] == {"date": "2026-10-01", "value": 337.476, "release": None}
+    assert state["summary"] == V2["summary"]
+    assert state["market"] == V2["market"]
+    for key in ("calendar", "forecasts", "fomc_outlook", "fed_target", "sosovalue", "monthly"):
+        assert key in state
+    assert state["monthly"] == {"last_month": None}
+
+
+def test_v2_to_v3_does_not_copy_market_vix_into_summary():
+    """v2 の market.vix は毎時の基準で、朝のまとめの基準ではない。"""
+    raw = {**V2, "summary": {"last_date": None, "values": {}}}
+    assert "vix" not in migrate(raw)["summary"]["values"]
+
+
+def test_v2_to_v3_drops_errors_of_renamed_keys_only():
+    state = migrate(V2)
+    assert "nfp" not in state["errors"]
+    assert "dxy" in state["errors"]
+
+
+def test_v3_migration_is_idempotent_and_keeps_release():
+    once = migrate(V2)
+    once["cpi"]["release"] = "2026-11-10"
+    twice = migrate(once)
+    assert twice == once

@@ -7,7 +7,8 @@ from fetchers import coinmetrics, etf, fomc, fred
 
 
 class _Resp:
-    def __init__(self, payload=None, status=200, text=""):
+    def __init__(self, payload=None, status=200, text="", headers=None):
+        self.headers = headers or {}
         self._payload = payload
         self.status_code = status
         self.ok = status < 400

@@ -172,3 +172,65 @@ def parse_fomc_decision(text: str | None) -> dict | None:
     except ValueError:
         return None
     return {"action": match.group(1).lower(), "lower": lower, "upper": upper}
+
+
+# ── 予想との比較（Phase B）────────────────────────────────────────────────
+
+OUTCOME_LABELS = {"above": "上振れ", "below": "下振れ", "match": "一致"}
+
+
+class ForecastResult(NamedTuple):
+    outcome: str      # "above" / "below" / "match"
+    verdict: Verdict
+    low: float        # 比べた予想の低い方
+    high: float       # 比べた予想の高い方
+
+
+def _comparable(metric: str, value: float) -> float:
+    """% の指標は公式発表と同じく小数1桁に丸めてから比べる（浮動小数の誤差を避ける）。"""
+    if config.FORECAST_METRICS[metric]["unit"] == "percent":
+        return round(value * 10) / 10
+    return value
+
+
+def compare_with_forecasts(
+    metric: str, actual: float | None, forecasts: Iterable[float]
+) -> ForecastResult | None:
+    """
+    実績を2つの予想の範囲と比べる。範囲はそれぞれの「同じとみなす幅」を含む。
+    予想が1つならその1つと比べる。予想がなければ None（前回値との比較に任せる）。
+    """
+    values = [_comparable(metric, f) for f in forecasts]
+    if actual is None or not values:
+        return None
+    current = _comparable(metric, actual)
+    low, high = min(values), max(values)
+    band = config.FORECAST_MATCH_BAND.get(metric, 0.0)
+    if current > high + band:
+        outcome = "above"
+    elif current < low - band:
+        outcome = "below"
+    else:
+        return ForecastResult("match", NEUTRAL, low, high)
+    rising_bullish = config.FORECAST_METRICS[metric]["direction"] > 0
+    verdict = BULLISH if (outcome == "above") == rising_bullish else BEARISH
+    return ForecastResult(outcome, verdict, low, high)
+
+
+def is_opposite(a: Verdict, b: Verdict) -> bool:
+    """強気と弱気で向きが逆。中立や判定不可は逆とみなさない。"""
+    return {a, b} == {BULLISH, BEARISH}
+
+
+def judge_fomc_surprise(decided: dict, expected_rate: float) -> tuple[Verdict, float]:
+    """
+    決定後の誘導目標の中央と、会合前の期待金利の差（bp）で判定する。
+    差がプラス（市場の予想より引き締め的）なら弱気。
+    """
+    middle = (decided["lower"] + decided["upper"]) / 2
+    diff_bp = round((middle - expected_rate) * 100, 1)
+    if diff_bp > config.FOMC_SURPRISE_BP:
+        return BEARISH, diff_bp
+    if diff_bp < -config.FOMC_SURPRISE_BP:
+        return BULLISH, diff_bp
+    return NEUTRAL, diff_bp

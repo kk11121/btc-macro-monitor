@@ -219,3 +219,95 @@ def test_parse_returns_none_when_unreadable(text):
 )
 def test_judge_fomc(decision, expected):
     assert rules.judge_fomc(decision) == expected
+
+
+# ── 予想との比較（過去の発表データ）──────────────────────────────────────────
+
+
+def test_forecasts_agree_cpi_core_mom_2026_11_10():
+    """コアCPI前月比 0.3%、予想 0.2%（SoSoValue）と 0.2%（ForexFactory）：上振れで弱気。"""
+    result = rules.compare_with_forecasts("core_cpi_mom", 0.3, [0.2, 0.2])
+    assert result.outcome == "above"
+    assert result.verdict == rules.BEARISH
+
+
+def test_forecasts_agree_cpi_headline_mom_2026_11_10():
+    """総合CPI前月比 0.4%、予想 0.3% と 0.3%：上振れ。"""
+    assert rules.compare_with_forecasts("cpi_mom", 0.4, [0.3, 0.3]).outcome == "above"
+
+
+def test_forecasts_agree_claims_2026_11_12():
+    """申請件数 20.0万件、予想 19.4万件と 194K：差 6,000件で幅（5,000件）を超え、上振れで強気。"""
+    result = rules.compare_with_forecasts("icsa", 200000.0, [194000.0, 194000.0])
+    assert result.outcome == "above"
+    assert result.verdict == rules.BULLISH
+
+
+def test_forecasts_agree_claims_2026_11_05():
+    """申請件数 18.9万件、予想 19.7万件と 197K：下振れで弱気。"""
+    result = rules.compare_with_forecasts("icsa", 189000.0, [197000.0, 197000.0])
+    assert result.outcome == "below"
+    assert result.verdict == rules.BEARISH
+
+
+def test_forecasts_split_nfp_2026_11_06():
+    """NFP 16.5万人、予想 6.3万人（SoSoValue、11月4日時点）と 65K：範囲 3.8万〜9.0万人の上。"""
+    result = rules.compare_with_forecasts("nfp", 165.0, [63.0, 65.0])
+    assert result.outcome == "above"
+    assert result.verdict == rules.BEARISH
+    assert (result.low, result.high) == (63.0, 65.0)
+
+
+def test_single_forecast_core_pce_2026_10_29():
+    """コアPCE前月比 0.3%、予想 0.3%（SoSoValue のみ）：一致で中立。"""
+    result = rules.compare_with_forecasts("core_pce_mom", 0.3, [0.3])
+    assert result.outcome == "match"
+    assert result.verdict == rules.NEUTRAL
+
+
+def test_single_forecast_nfp_2026_10_02():
+    """NFP 2.9万人、予想 8.9万人：幅を含めても下振れで強気。"""
+    result = rules.compare_with_forecasts("nfp", 29.0, [89.0])
+    assert result.outcome == "below"
+    assert result.verdict == rules.BULLISH
+
+
+@pytest.mark.parametrize(
+    ("actual", "outcome"),
+    [(64.0, "match"), (38.0, "match"), (90.0, "match"), (90.5, "above"), (37.5, "below")],
+)
+def test_split_forecast_range_includes_each_band(actual, outcome):
+    """割れた予想（6.3万・6.5万人）の範囲は、それぞれの幅（±2.5万人）を含む（作った値）。"""
+    assert rules.compare_with_forecasts("nfp", actual, [63.0, 65.0]).outcome == outcome
+
+
+def test_percent_comparison_rounds_to_one_decimal():
+    assert rules.compare_with_forecasts("core_cpi_mom", 0.2999999, [0.3]).outcome == "match"
+
+
+def test_unrate_above_forecast_is_bullish():
+    assert rules.compare_with_forecasts("unrate", 4.3, [4.2]).verdict == rules.BULLISH
+
+
+def test_no_forecast_returns_none():
+    assert rules.compare_with_forecasts("nfp", 100.0, []) is None
+    assert rules.compare_with_forecasts("nfp", None, [63.0]) is None
+
+
+def test_is_opposite():
+    assert rules.is_opposite(rules.BULLISH, rules.BEARISH)
+    assert not rules.is_opposite(rules.BULLISH, rules.NEUTRAL)
+    assert not rules.is_opposite(rules.BEARISH, rules.BEARISH)
+
+
+@pytest.mark.parametrize(
+    ("decided", "expected", "verdict", "diff"),
+    [
+        ({"lower": 3.50, "upper": 3.75}, 3.45, rules.BEARISH, 17.5),  # 設計書の見本
+        ({"lower": 3.50, "upper": 3.75}, 3.80, rules.BULLISH, -17.5),
+        ({"lower": 3.75, "upper": 4.00}, 3.90, rules.NEUTRAL, -2.5),
+        ({"lower": 3.75, "upper": 4.00}, 3.775, rules.NEUTRAL, 10.0),  # 境目は中立
+    ],
+)
+def test_judge_fomc_surprise(decided, expected, verdict, diff):
+    assert rules.judge_fomc_surprise(decided, expected) == (verdict, diff)
