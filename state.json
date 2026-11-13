@@ -214,10 +214,10 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1525,
+      "expected_rate": 4.1582,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 63.6,
-      "as_of": "2026-11-13T05:20:56+00:00"
+      "priced_bp": 63.5,
+      "as_of": "2026-11-13T06:20:02+00:00"
     },
     "pre_meeting": {}
   },
@@ -227,9 +227,9 @@
     "date": "2026-11-12"
   },
   "sosovalue": {
-    "remaining_month": 9796,
+    "remaining_month": 9794,
     "limit_month": 10000,
-    "checked_at": "2026-11-13T05:23:37+00:00"
+    "checked_at": "2026-11-13T06:23:41+00:00"
   },
   "monthly": {
     "last_month": null
