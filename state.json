@@ -71,21 +71,21 @@
     }
   },
   "summary": {
-    "last_date": "2026-11-13",
+    "last_date": "2026-11-14",
     "values": {
-      "dxy": 103.18499755859375,
-      "us10y": 5.102999687194824,
-      "nasdaq": 25366.09375,
-      "vix": 18.700000762939453,
-      "usdt": 175878916674.15686,
-      "usdc": 69177122738.12773,
-      "btc_exchange": 2719874.21376106,
+      "dxy": 103.41100311279297,
+      "us10y": 5.154000282287598,
+      "nasdaq": 25136.2734375,
+      "vix": 19.299999237060547,
+      "usdt": 175717172206.94257,
+      "usdc": 69045562351.58119,
+      "btc_exchange": 2723130.5691887,
       "fear_greed": {
-        "value": 28.0,
-        "zone": "fear",
-        "date": "2026-11-12"
+        "value": 20.0,
+        "zone": "extreme_fear",
+        "date": "2026-11-13"
       },
-      "funding_rate": 0.0001
+      "funding_rate": 5.71818404653e-05
     }
   },
   "schema_version": 3,
@@ -200,7 +200,15 @@
   },
   "forecasts": {},
   "fomc_outlook": {
-    "morning": null,
+    "morning": {
+      "meeting": "2026-12-09",
+      "cut_prob": 0.0,
+      "hike_prob": 100.0,
+      "expected_rate": 4.1375,
+      "horizon_meeting": "2027-03-17",
+      "priced_bp": 59.2,
+      "as_of": "2026-11-13T22:47:38+00:00"
+    },
     "notified": {
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
@@ -227,9 +235,9 @@
     "date": "2026-11-13"
   },
   "sosovalue": {
-    "remaining_month": 9756,
+    "remaining_month": 9754,
     "limit_month": 10000,
-    "checked_at": "2026-11-13T22:42:12+00:00"
+    "checked_at": "2026-11-13T22:47:38+00:00"
   },
   "monthly": {
     "last_month": null
