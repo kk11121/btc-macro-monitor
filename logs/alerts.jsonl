@@ -1,0 +1,1 @@
+{"id": "1a73cc9ae4e64b37", "ts": "2026-11-13T14:23:39+00:00", "indicator": "spot_etf", "kind": "daily_flow", "actual": -283997508.0, "compared": {"band": {"mean": 41513994.976555556, "low": -538914547.04115, "high": 621942536.9942611, "samples": 90}}, "verdict": "弱気", "date": "2026-11-12", "btc_price": null, "btc_price_1h": null, "btc_price_24h": null, "btc_price_72h": null}
