@@ -71,21 +71,21 @@
     }
   },
   "summary": {
-    "last_date": "2026-11-16",
+    "last_date": "2026-11-17",
     "values": {
-      "dxy": 103.41100311279297,
-      "us10y": 5.1539998054504395,
-      "nasdaq": 25136.26953125,
-      "vix": 19.299999237060547,
-      "usdt": 175398004599.97,
-      "usdc": 69075208062.44005,
-      "btc_exchange": 2720718.54204286,
+      "dxy": 103.58499908447266,
+      "us10y": 5.120999813079834,
+      "nasdaq": 24509.7578125,
+      "vix": 22.90999984741211,
+      "usdt": 175434516580.99197,
+      "usdc": 69158687625.03423,
+      "btc_exchange": 2708826.18786004,
       "fear_greed": {
         "value": 10.0,
         "zone": "extreme_fear",
-        "date": "2026-11-15"
+        "date": "2026-11-16"
       },
-      "funding_rate": -3.8464024549e-06
+      "funding_rate": 4.88770324215e-05
     }
   },
   "schema_version": 3,
@@ -204,10 +204,10 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.152,
+      "expected_rate": 4.1357,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 63.4,
-      "as_of": "2026-11-15T22:44:17+00:00"
+      "priced_bp": 62.0,
+      "as_of": "2026-11-16T22:42:54+00:00"
     },
     "notified": {
       "meeting": "2026-12-09",
@@ -235,9 +235,9 @@
     "date": "2026-11-16"
   },
   "sosovalue": {
-    "remaining_month": 9584,
+    "remaining_month": 9582,
     "limit_month": 10000,
-    "checked_at": "2026-11-16T22:23:32+00:00"
+    "checked_at": "2026-11-16T22:47:31+00:00"
   },
   "monthly": {
     "last_month": null
