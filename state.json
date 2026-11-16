@@ -96,7 +96,7 @@
   },
   "errors": {},
   "calendar": {
-    "fetched": "2026-11-15T17:23:32+00:00",
+    "fetched": "2026-11-16T13:23:33+00:00",
     "releases": {
       "cpi": [
         "2025-04-10",
@@ -222,22 +222,22 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1415,
+      "expected_rate": 4.1407,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 61.1,
-      "as_of": "2026-11-16T12:23:42+00:00"
+      "priced_bp": 60.8,
+      "as_of": "2026-11-16T13:20:57+00:00"
     },
     "pre_meeting": {}
   },
   "fed_target": {
     "lower": 3.75,
     "upper": 4.0,
-    "date": "2026-11-15"
+    "date": "2026-11-16"
   },
   "sosovalue": {
-    "remaining_month": 9606,
+    "remaining_month": 9604,
     "limit_month": 10000,
-    "checked_at": "2026-11-16T12:23:43+00:00"
+    "checked_at": "2026-11-16T13:23:36+00:00"
   },
   "monthly": {
     "last_month": null
