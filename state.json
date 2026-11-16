@@ -224,8 +224,8 @@
       "hike_prob": 100.0,
       "expected_rate": 4.15,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 63.3,
-      "as_of": "2026-11-16T06:20:04+00:00"
+      "priced_bp": 62.8,
+      "as_of": "2026-11-16T07:21:22+00:00"
     },
     "pre_meeting": {}
   },
@@ -235,9 +235,9 @@
     "date": "2026-11-15"
   },
   "sosovalue": {
-    "remaining_month": 9620,
+    "remaining_month": 9618,
     "limit_month": 10000,
-    "checked_at": "2026-11-16T06:23:27+00:00"
+    "checked_at": "2026-11-16T07:23:35+00:00"
   },
   "monthly": {
     "last_month": null
