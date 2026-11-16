@@ -235,9 +235,9 @@
     "date": "2026-11-16"
   },
   "sosovalue": {
-    "remaining_month": 9600,
+    "remaining_month": 9598,
     "limit_month": 10000,
-    "checked_at": "2026-11-16T16:18:58+00:00"
+    "checked_at": "2026-11-16T16:23:31+00:00"
   },
   "monthly": {
     "last_month": null
