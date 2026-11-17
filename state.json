@@ -46,14 +46,14 @@
   },
   "flows": {
     "spot_etf": {
-      "date": "2026-11-13",
-      "value": -185450233.4,
+      "date": "2026-11-16",
+      "value": 7986219.699999999,
       "source": "sosovalue",
       "outside": false,
       "band": {
-        "mean": 39301356.62100001,
-        "low": -544583789.630655,
-        "high": 623186502.8726552,
+        "mean": 38299706.21111111,
+        "low": -546827437.2672553,
+        "high": 623426849.6894774,
         "samples": 90
       }
     },
@@ -222,22 +222,22 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1365,
+      "expected_rate": 4.139,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 60.4,
-      "as_of": "2026-11-17T12:19:42+00:00"
+      "priced_bp": 60.1,
+      "as_of": "2026-11-17T13:22:09+00:00"
     },
     "pre_meeting": {}
   },
   "fed_target": {
     "lower": 3.75,
     "upper": 4.0,
-    "date": "2026-11-16"
+    "date": "2026-11-17"
   },
   "sosovalue": {
-    "remaining_month": 9552,
+    "remaining_month": 9550,
     "limit_month": 10000,
-    "checked_at": "2026-11-17T12:23:33+00:00"
+    "checked_at": "2026-11-17T13:23:39+00:00"
   },
   "monthly": {
     "last_month": null
