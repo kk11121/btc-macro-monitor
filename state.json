@@ -58,14 +58,14 @@
       }
     },
     "exchange_netflow": {
-      "date": "2026-11-15",
-      "value": -12011.92860222,
+      "date": "2026-11-16",
+      "value": 2560.98630891,
       "source": null,
       "outside": false,
       "band": {
-        "mean": -2472.337047148222,
-        "low": -13432.510968672777,
-        "high": 8487.836874376335,
+        "mean": -2576.031922953,
+        "low": -13719.193529115308,
+        "high": 8567.129683209308,
         "samples": 90
       }
     }
@@ -224,8 +224,8 @@
       "hike_prob": 100.0,
       "expected_rate": 4.1357,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 60.8,
-      "as_of": "2026-11-17T02:20:57+00:00"
+      "priced_bp": 60.3,
+      "as_of": "2026-11-17T03:23:38+00:00"
     },
     "pre_meeting": {}
   },
@@ -235,9 +235,9 @@
     "date": "2026-11-16"
   },
   "sosovalue": {
-    "remaining_month": 9574,
+    "remaining_month": 9572,
     "limit_month": 10000,
-    "checked_at": "2026-11-17T02:23:37+00:00"
+    "checked_at": "2026-11-17T03:23:38+00:00"
   },
   "monthly": {
     "last_month": null
