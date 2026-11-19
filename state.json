@@ -40,7 +40,7 @@
     "value": 4.1
   },
   "icsa": {
-    "release": null,
+    "release": "2026-11-19",
     "date": "2026-11-07",
     "value": 200000.0
   },
@@ -201,7 +201,7 @@
   "forecasts": {
     "icsa": {
       "release_date": "2026-11-19",
-      "fetched_at": "2026-11-18T22:47:39+00:00",
+      "fetched_at": "2026-11-19T13:27:00+00:00",
       "values": {
         "icsa": {
           "sosovalue": 198000.0,
@@ -235,20 +235,20 @@
       "hike_prob": 100.0,
       "expected_rate": 4.1482,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 62.1,
-      "as_of": "2026-11-19T12:23:35+00:00"
+      "priced_bp": 62.6,
+      "as_of": "2026-11-19T13:21:59+00:00"
     },
     "pre_meeting": {}
   },
   "fed_target": {
     "lower": 3.75,
     "upper": 4.0,
-    "date": "2026-11-18"
+    "date": "2026-11-19"
   },
   "sosovalue": {
-    "remaining_month": 9438,
+    "remaining_month": 9430,
     "limit_month": 10000,
-    "checked_at": "2026-11-19T12:23:36+00:00"
+    "checked_at": "2026-11-19T13:32:03+00:00"
   },
   "monthly": {
     "last_month": null
