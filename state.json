@@ -21,7 +21,7 @@
   },
   "market": {
     "vix": {
-      "value": 25.850000381469727
+      "value": 21.940000534057617
     }
   },
   "liquidity": {
@@ -236,7 +236,7 @@
       "expected_rate": 4.1433,
       "horizon_meeting": "2027-03-17",
       "priced_bp": 61.1,
-      "as_of": "2026-11-19T08:23:07+00:00"
+      "as_of": "2026-11-19T09:23:12+00:00"
     },
     "pre_meeting": {}
   },
@@ -246,9 +246,9 @@
     "date": "2026-11-18"
   },
   "sosovalue": {
-    "remaining_month": 9446,
+    "remaining_month": 9444,
     "limit_month": 10000,
-    "checked_at": "2026-11-19T08:23:38+00:00"
+    "checked_at": "2026-11-19T09:23:36+00:00"
   },
   "monthly": {
     "last_month": null
