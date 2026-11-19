@@ -30,8 +30,8 @@
       "value": 23413.9
     },
     "walcl": {
-      "date": "2026-11-11",
-      "value": 6758867.0
+      "date": "2026-11-18",
+      "value": 6741452.0
     }
   },
   "unrate": {
@@ -71,21 +71,21 @@
     }
   },
   "summary": {
-    "last_date": "2026-11-19",
+    "last_date": "2026-11-20",
     "values": {
-      "dxy": 103.78199768066406,
-      "us10y": 5.065999984741211,
-      "nasdaq": 24429.884765625,
-      "vix": 24.559999465942383,
-      "usdt": 175438337071.15536,
-      "usdc": 68318329725.77859,
-      "btc_exchange": 2707552.10221694,
+      "dxy": 103.9280014038086,
+      "us10y": 5.052000045776367,
+      "nasdaq": 23879.19921875,
+      "vix": 28.440000534057617,
+      "usdt": 175246054068.6087,
+      "usdc": 68617552594.6686,
+      "btc_exchange": 2711760.24371808,
       "fear_greed": {
-        "value": 11.0,
+        "value": 10.0,
         "zone": "extreme_fear",
-        "date": "2026-11-18"
+        "date": "2026-11-19"
       },
-      "funding_rate": 1.65843088309e-05
+      "funding_rate": 9.5350278021e-06
     }
   },
   "schema_version": 3,
@@ -96,7 +96,7 @@
   },
   "errors": {},
   "calendar": {
-    "fetched": "2026-11-19T02:23:45+00:00",
+    "fetched": "2026-11-19T22:47:33+00:00",
     "releases": {
       "cpi": [
         "2025-04-10",
@@ -215,10 +215,10 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.149,
+      "expected_rate": 4.134,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 61.4,
-      "as_of": "2026-11-18T22:45:12+00:00"
+      "priced_bp": 57.9,
+      "as_of": "2026-11-19T22:44:28+00:00"
     },
     "notified": {
       "meeting": "2026-12-09",
@@ -246,9 +246,9 @@
     "date": "2026-11-19"
   },
   "sosovalue": {
-    "remaining_month": 9408,
+    "remaining_month": 9406,
     "limit_month": 10000,
-    "checked_at": "2026-11-19T22:23:28+00:00"
+    "checked_at": "2026-11-19T22:47:35+00:00"
   },
   "monthly": {
     "last_month": null
