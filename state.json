@@ -233,22 +233,22 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1255,
+      "expected_rate": 4.1262,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 55.3,
-      "as_of": "2026-11-20T12:23:34+00:00"
+      "priced_bp": 54.3,
+      "as_of": "2026-11-20T12:57:27+00:00"
     },
     "pre_meeting": {}
   },
   "fed_target": {
     "lower": 3.75,
     "upper": 4.0,
-    "date": "2026-11-19"
+    "date": "2026-11-20"
   },
   "sosovalue": {
-    "remaining_month": 9376,
+    "remaining_month": 9374,
     "limit_month": 10000,
-    "checked_at": "2026-11-20T12:23:36+00:00"
+    "checked_at": "2026-11-20T13:01:55+00:00"
   },
   "monthly": {
     "last_month": null
