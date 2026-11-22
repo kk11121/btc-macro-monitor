@@ -236,7 +236,7 @@
       "expected_rate": 4.0965,
       "horizon_meeting": "2027-03-17",
       "priced_bp": 48.2,
-      "as_of": "2026-11-21T23:21:17+00:00"
+      "as_of": "2026-11-22T00:19:07+00:00"
     },
     "pre_meeting": {}
   },
@@ -246,9 +246,9 @@
     "date": "2026-11-21"
   },
   "sosovalue": {
-    "remaining_month": 9290,
+    "remaining_month": 9288,
     "limit_month": 10000,
-    "checked_at": "2026-11-21T23:25:33+00:00"
+    "checked_at": "2026-11-22T00:23:35+00:00"
   },
   "monthly": {
     "last_month": null
