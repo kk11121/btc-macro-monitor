@@ -71,21 +71,21 @@
     }
   },
   "summary": {
-    "last_date": "2026-11-23",
+    "last_date": "2026-11-24",
     "values": {
-      "dxy": 103.83999633789062,
-      "us10y": 4.9120001792907715,
-      "nasdaq": 22617.73046875,
-      "vix": 35.88999938964844,
-      "usdt": 174843700863.34244,
-      "usdc": 68433498505.814514,
-      "btc_exchange": 2709906.0558609,
+      "dxy": 104.33100128173828,
+      "us10y": 4.918000221252441,
+      "nasdaq": 24089.55859375,
+      "vix": 26.6200008392334,
+      "usdt": 174838500863.1826,
+      "usdc": 69012331005.82915,
+      "btc_exchange": 2699120.72331477,
       "fear_greed": {
         "value": 11.0,
         "zone": "extreme_fear",
-        "date": "2026-11-22"
+        "date": "2026-11-23"
       },
-      "funding_rate": 2.32493192759e-05
+      "funding_rate": 5.75171997412e-05
     }
   },
   "schema_version": 3,
@@ -94,12 +94,7 @@
     "date": "2026-09-01",
     "value": 130.902
   },
-  "errors": {
-    "btc_exchange": {
-      "label": "取引所BTC残高",
-      "since": "2026-11-22T22:48:05+00:00"
-    }
-  },
+  "errors": {},
   "calendar": {
     "fetched": "2026-11-23T09:23:30+00:00",
     "releases": {
@@ -205,12 +200,22 @@
   },
   "forecasts": {
     "icsa": {
-      "release_date": "2026-11-19",
-      "fetched_at": "2026-11-19T13:27:00+00:00",
+      "release_date": "2026-11-25",
+      "fetched_at": "2026-11-23T22:47:34+00:00",
       "values": {
         "icsa": {
-          "sosovalue": 198000.0,
-          "forexfactory": 198000.0
+          "sosovalue": 201000.0,
+          "forexfactory": 201000.0
+        }
+      }
+    },
+    "core_pce": {
+      "release_date": "2026-11-25",
+      "fetched_at": "2026-11-23T22:47:34+00:00",
+      "values": {
+        "core_pce_mom": {
+          "sosovalue": 0.3,
+          "forexfactory": 0.3
         }
       }
     }
@@ -219,11 +224,11 @@
     "morning": {
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
-      "hike_prob": 88.6,
-      "expected_rate": 4.0965,
+      "hike_prob": 100.0,
+      "expected_rate": 4.1353,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 51.7,
-      "as_of": "2026-11-22T22:47:30+00:00"
+      "priced_bp": 55.8,
+      "as_of": "2026-11-23T22:47:34+00:00"
     },
     "notified": {
       "meeting": "2026-12-09",
@@ -251,9 +256,9 @@
     "date": "2026-11-23"
   },
   "sosovalue": {
-    "remaining_month": 9184,
+    "remaining_month": 9180,
     "limit_month": 10000,
-    "checked_at": "2026-11-23T22:23:38+00:00"
+    "checked_at": "2026-11-23T22:47:34+00:00"
   },
   "monthly": {
     "last_month": null
