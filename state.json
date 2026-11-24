@@ -26,8 +26,8 @@
   },
   "liquidity": {
     "m2sl": {
-      "date": "2026-09-01",
-      "value": 23413.9
+      "date": "2026-10-01",
+      "value": 23532.8
     },
     "walcl": {
       "date": "2026-11-18",
@@ -71,21 +71,21 @@
     }
   },
   "summary": {
-    "last_date": "2026-11-24",
+    "last_date": "2026-11-25",
     "values": {
-      "dxy": 104.33100128173828,
-      "us10y": 4.918000221252441,
-      "nasdaq": 24089.55859375,
-      "vix": 26.6200008392334,
+      "dxy": 103.82499694824219,
+      "us10y": 4.904000282287598,
+      "nasdaq": 23733.53515625,
+      "vix": 26.360000610351562,
       "usdt": 174838500863.1826,
-      "usdc": 69012331005.82915,
-      "btc_exchange": 2699120.72331477,
+      "usdc": 69025044703.05852,
+      "btc_exchange": 2708748.5228757,
       "fear_greed": {
         "value": 11.0,
         "zone": "extreme_fear",
-        "date": "2026-11-23"
+        "date": "2026-11-24"
       },
-      "funding_rate": 5.75171997412e-05
+      "funding_rate": 7.27614306536e-05
     }
   },
   "schema_version": 3,
@@ -201,7 +201,7 @@
   "forecasts": {
     "icsa": {
       "release_date": "2026-11-25",
-      "fetched_at": "2026-11-23T22:47:34+00:00",
+      "fetched_at": "2026-11-24T22:47:32+00:00",
       "values": {
         "icsa": {
           "sosovalue": 201000.0,
@@ -211,7 +211,7 @@
     },
     "core_pce": {
       "release_date": "2026-11-25",
-      "fetched_at": "2026-11-23T22:47:34+00:00",
+      "fetched_at": "2026-11-24T22:47:32+00:00",
       "values": {
         "core_pce_mom": {
           "sosovalue": 0.3,
@@ -225,10 +225,10 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1353,
+      "expected_rate": 4.132,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 55.8,
-      "as_of": "2026-11-23T22:47:34+00:00"
+      "priced_bp": 57.1,
+      "as_of": "2026-11-24T22:47:33+00:00"
     },
     "notified": {
       "meeting": "2026-12-09",
@@ -256,9 +256,9 @@
     "date": "2026-11-24"
   },
   "sosovalue": {
-    "remaining_month": 9126,
+    "remaining_month": 9122,
     "limit_month": 10000,
-    "checked_at": "2026-11-24T22:23:30+00:00"
+    "checked_at": "2026-11-24T22:47:33+00:00"
   },
   "monthly": {
     "last_month": null
