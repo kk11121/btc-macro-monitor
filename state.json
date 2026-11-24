@@ -46,14 +46,14 @@
   },
   "flows": {
     "spot_etf": {
-      "date": "2026-11-20",
-      "value": -669162059.12,
+      "date": "2026-11-23",
+      "value": -569739636.2999997,
       "source": "sosovalue",
-      "outside": true,
+      "outside": false,
       "band": {
-        "mean": 26352590.23388889,
-        "low": -571203646.914982,
-        "high": 623908827.3827597,
+        "mean": 18038011.543888893,
+        "low": -597112123.3133204,
+        "high": 633188146.4010983,
         "samples": 90
       }
     },
@@ -96,7 +96,7 @@
   },
   "errors": {},
   "calendar": {
-    "fetched": "2026-11-23T09:23:30+00:00",
+    "fetched": "2026-11-24T05:23:31+00:00",
     "releases": {
       "cpi": [
         "2025-04-10",
@@ -243,10 +243,10 @@
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
       "hike_prob": 100.0,
-      "expected_rate": 4.1372,
+      "expected_rate": 4.1353,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 56.0,
-      "as_of": "2026-11-24T04:23:27+00:00"
+      "priced_bp": 55.8,
+      "as_of": "2026-11-24T05:23:33+00:00"
     },
     "pre_meeting": {}
   },
@@ -256,9 +256,9 @@
     "date": "2026-11-23"
   },
   "sosovalue": {
-    "remaining_month": 9166,
+    "remaining_month": 9164,
     "limit_month": 10000,
-    "checked_at": "2026-11-24T04:23:29+00:00"
+    "checked_at": "2026-11-24T05:23:33+00:00"
   },
   "monthly": {
     "last_month": null

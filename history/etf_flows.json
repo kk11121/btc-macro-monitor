@@ -2,11 +2,6 @@
   "backfilled": true,
   "rows": [
     {
-      "date": "2026-06-03",
-      "value": -396596501.8,
-      "source": "tftc"
-    },
-    {
       "date": "2026-06-04",
       "value": 3046802.14,
       "source": "tftc"
@@ -599,6 +594,11 @@
     {
       "date": "2026-11-20",
       "value": -669162059.12,
+      "source": "sosovalue"
+    },
+    {
+      "date": "2026-11-23",
+      "value": -569739636.2999997,
       "source": "sosovalue"
     }
   ]
