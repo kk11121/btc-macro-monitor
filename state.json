@@ -40,7 +40,7 @@
     "value": 4.1
   },
   "icsa": {
-    "release": "2026-11-19",
+    "release": "2026-11-25",
     "date": "2026-11-14",
     "value": 203000.0
   },
@@ -90,7 +90,7 @@
   },
   "schema_version": 3,
   "core_pce": {
-    "release": null,
+    "release": "2026-11-25",
     "date": "2026-09-01",
     "value": 130.902
   },
@@ -201,7 +201,7 @@
   "forecasts": {
     "icsa": {
       "release_date": "2026-11-25",
-      "fetched_at": "2026-11-24T22:47:32+00:00",
+      "fetched_at": "2026-11-25T13:27:00+00:00",
       "values": {
         "icsa": {
           "sosovalue": 201000.0,
@@ -211,7 +211,7 @@
     },
     "core_pce": {
       "release_date": "2026-11-25",
-      "fetched_at": "2026-11-24T22:47:32+00:00",
+      "fetched_at": "2026-11-25T13:27:00+00:00",
       "values": {
         "core_pce_mom": {
           "sosovalue": 0.3,
@@ -242,23 +242,23 @@
     "latest": {
       "meeting": "2026-12-09",
       "cut_prob": 0.0,
-      "hike_prob": 97.8,
-      "expected_rate": 4.1195,
+      "hike_prob": 99.8,
+      "expected_rate": 4.1245,
       "horizon_meeting": "2027-03-17",
-      "priced_bp": 53.5,
-      "as_of": "2026-11-25T12:20:10+00:00"
+      "priced_bp": 53.6,
+      "as_of": "2026-11-25T13:22:12+00:00"
     },
     "pre_meeting": {}
   },
   "fed_target": {
     "lower": 3.75,
     "upper": 4.0,
-    "date": "2026-11-24"
+    "date": "2026-11-25"
   },
   "sosovalue": {
-    "remaining_month": 9092,
+    "remaining_month": 9080,
     "limit_month": 10000,
-    "checked_at": "2026-11-25T12:23:36+00:00"
+    "checked_at": "2026-11-25T13:32:17+00:00"
   },
   "monthly": {
     "last_month": null
