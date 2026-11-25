@@ -58,14 +58,14 @@
       }
     },
     "exchange_netflow": {
-      "date": "2026-11-23",
-      "value": 9379.06741096,
+      "date": "2026-11-24",
+      "value": -33.049614619998465,
       "source": null,
-      "outside": true,
+      "outside": false,
       "band": {
-        "mean": -2335.7630263157776,
-        "low": -12969.872494876041,
-        "high": 8298.346442244487,
+        "mean": -2223.432706423111,
+        "low": -13136.059338033036,
+        "high": 8689.193925186813,
         "samples": 90
       }
     }
@@ -94,12 +94,7 @@
     "date": "2026-09-01",
     "value": 130.902
   },
-  "errors": {
-    "exchange_netflow": {
-      "label": "取引所BTC純流入",
-      "since": "2026-11-25T01:23:38+00:00"
-    }
-  },
+  "errors": {},
   "calendar": {
     "fetched": "2026-11-25T01:23:34+00:00",
     "releases": {
@@ -251,7 +246,7 @@
       "expected_rate": 4.134,
       "horizon_meeting": "2027-03-17",
       "priced_bp": 57.2,
-      "as_of": "2026-11-25T01:20:01+00:00"
+      "as_of": "2026-11-25T02:23:32+00:00"
     },
     "pre_meeting": {}
   },
@@ -261,9 +256,9 @@
     "date": "2026-11-24"
   },
   "sosovalue": {
-    "remaining_month": 9116,
+    "remaining_month": 9114,
     "limit_month": 10000,
-    "checked_at": "2026-11-25T01:23:37+00:00"
+    "checked_at": "2026-11-25T02:23:33+00:00"
   },
   "monthly": {
     "last_month": null
