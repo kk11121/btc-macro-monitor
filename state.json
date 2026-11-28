@@ -96,7 +96,7 @@
   },
   "errors": {},
   "calendar": {
-    "fetched": "2026-11-27T15:23:31+00:00",
+    "fetched": "2026-11-28T11:23:32+00:00",
     "releases": {
       "cpi": [
         "2025-04-10",
@@ -246,7 +246,7 @@
       "expected_rate": 4.121,
       "horizon_meeting": "2027-03-17",
       "priced_bp": 56.8,
-      "as_of": "2026-11-28T10:23:30+00:00"
+      "as_of": "2026-11-28T11:19:55+00:00"
     },
     "pre_meeting": {}
   },
@@ -256,9 +256,9 @@
     "date": "2026-11-27"
   },
   "sosovalue": {
-    "remaining_month": 8920,
+    "remaining_month": 8918,
     "limit_month": 10000,
-    "checked_at": "2026-11-28T10:23:31+00:00"
+    "checked_at": "2026-11-28T11:23:35+00:00"
   },
   "monthly": {
     "last_month": null
